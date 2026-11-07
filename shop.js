@@ -1,0 +1,199 @@
+(function () {
+  const C = window.SHOP_CONFIG;
+  const { money, esc, imgTag, totalStock } = window.KERB;
+  const $ = s => document.querySelector(s);
+  const $$ = s => [...document.querySelectorAll(s)];
+
+  let products = [];
+  let filter = "all";
+  let sort = "featured";
+  let cart = [];
+  try { cart = JSON.parse(localStorage.getItem("hs_cart") || "[]"); } catch {}
+
+  // ---------- static content from config ----------
+  $("#logo").innerHTML = esc(C.brand) + (C.brandSuffix ? `<span>${esc(C.brandSuffix)}</span>` : "");
+  if (C.logo) $("#heroLogo").src = C.logo;
+  $("#tagline").textContent = C.tagline;
+  $("#welcomePct").textContent = C.welcomePercent;
+  $("#freeShip").textContent = `On orders over ${money(C.freeShippingOver)}`;
+  $("#lookA").style.backgroundImage = `url("${C.lookbookImages[0]}")`;
+  $("#lookB").style.backgroundImage = `url("${C.lookbookImages[1]}")`;
+  $("#contactLink").href = "mailto:" + C.contactEmail;
+  $("#igLink").href = C.instagram;
+  $("#ttLink").href = C.tiktok;
+  $("#year").textContent = new Date().getFullYear();
+  const tick = ["Free UK delivery over " + money(C.freeShippingOver), "New drops every Friday", `Join the list for ${C.welcomePercent}% off`];
+  $("#ticker").innerHTML = [...tick, ...tick, ...tick, ...tick].map(t => `<span>${esc(t)} ✦</span>`).join("");
+
+  // ---------- toast ----------
+  let tt;
+  function toast(msg) {
+    const t = $("#toast"); t.textContent = msg; t.classList.add("show");
+    clearTimeout(tt); tt = setTimeout(() => t.classList.remove("show"), 2600);
+  }
+
+  // ---------- render grid ----------
+  function renderGrid() {
+    let list = products.filter(p => filter === "all" || p.category === filter);
+    if (sort === "low") list = [...list].sort((a, b) => a.price - b.price);
+    if (sort === "high") list = [...list].sort((a, b) => b.price - a.price);
+    if (!list.length) { $("#grid").innerHTML = `<p class="empty">Nothing here yet — check back for the next drop.</p>`; return; }
+    $("#grid").innerHTML = list.map((p, i) => {
+      const stock = totalStock(p);
+      const badge = stock === 0 ? `<span class="badge out">Sold out</span>`
+        : p.badge ? `<span class="badge ${p.badge.toLowerCase() === "sale" ? "sale" : ""}">${esc(p.badge)}</span>` : "";
+      const low = stock > 0 && stock <= C.lowStockThreshold * 2 ? `<div class="low">Selling fast</div>` : "";
+      return `<article class="card" data-id="${esc(p.id)}" style="animation-delay:${i * 40}ms" tabindex="0">
+        <div class="card-img">${imgTag(p.image, p.name)}${badge}<div class="quick">Quick view</div></div>
+        <div class="card-info"><div><h3>${esc(p.name)}</h3><div class="cat">${esc(p.category)}</div>${low}</div><div class="price">${money(p.price)}</div></div>
+      </article>`;
+    }).join("");
+  }
+
+  // ---------- product modal ----------
+  function openProduct(id) {
+    const p = products.find(x => x.id === id); if (!p) return;
+    let selected = null;
+    const sizes = Object.entries(p.sizes || {});
+    $("#productBody").innerHTML = `<div class="pm">
+      <div class="pm-img">${imgTag(p.image, p.name)}</div>
+      <div class="pm-info">
+        <p class="eyebrow">${esc(p.category)}</p>
+        <h2>${esc(p.name)}</h2>
+        <div class="pm-price">${money(p.price)}</div>
+        <p class="pm-desc">${esc(p.description)}</p>
+        <div><p class="small" style="margin-bottom:.5rem">SELECT SIZE</p>
+          <div class="sizes">${sizes.map(([s, n]) => `<button class="size" data-size="${esc(s)}" ${n > 0 ? "" : "disabled"}>${esc(s)}</button>`).join("")}</div></div>
+        <div class="stock-note" id="stockNote"></div>
+        <button class="btn btn-accent btn-block" id="addBtn" disabled>Select a size</button>
+      </div></div>`;
+    $$("#productBody .size").forEach(b => b.onclick = () => {
+      $$("#productBody .size").forEach(x => x.classList.remove("sel"));
+      b.classList.add("sel"); selected = b.dataset.size;
+      const n = p.sizes[selected];
+      $("#stockNote").textContent = n <= C.lowStockThreshold ? `Only ${n} left in ${selected}` : "In stock";
+      $("#addBtn").disabled = false; $("#addBtn").textContent = "Add to bag — " + money(p.price);
+    });
+    $("#addBtn").onclick = () => { addToCart(p, selected); close("#productOverlay"); };
+    open("#productOverlay");
+  }
+
+  // ---------- cart ----------
+  function saveCart() { try { localStorage.setItem("hs_cart", JSON.stringify(cart)); } catch {} renderCart(); }
+  function addToCart(p, size) {
+    const line = cart.find(l => l.id === p.id && l.size === size);
+    const max = p.sizes[size] || 0;
+    if (line) { if (line.qty >= max) return toast(`Only ${max} available in ${size}`); line.qty++; }
+    else cart.push({ id: p.id, size, qty: 1, name: p.name, price: p.price, image: p.image });
+    saveCart();
+    const b = $("#cartBtn"); b.classList.remove("bump"); void b.offsetWidth; b.classList.add("bump");
+    toast(`${p.name} (${size}) added to bag`);
+  }
+  function totals() {
+    const sub = cart.reduce((a, l) => a + l.price * l.qty, 0);
+    const ship = sub === 0 || sub >= C.freeShippingOver ? 0 : C.shippingCost;
+    return { sub, ship, total: sub + ship };
+  }
+  function renderCart() {
+    $("#cartCount").textContent = cart.reduce((a, l) => a + l.qty, 0);
+    const { sub, ship, total } = totals();
+    $("#cartItems").innerHTML = cart.length ? cart.map((l, i) => `<div class="line">
+        ${imgTag(l.image, l.name)}
+        <div><h4>${esc(l.name)}</h4><div class="small">Size ${esc(l.size)}</div>
+          <div class="qty"><button data-dec="${i}" aria-label="Decrease">−</button><span>${l.qty}</span><button data-inc="${i}" aria-label="Increase">+</button></div>
+          <button class="remove" data-rm="${i}">Remove</button></div>
+        <strong>${money(l.price * l.qty)}</strong></div>`).join("")
+      : `<p class="empty">Your bag is empty. Go find some heat.</p>`;
+    $("#subtotal").textContent = money(sub);
+    $("#shipping").textContent = ship === 0 && sub > 0 ? "FREE" : money(ship);
+    $("#total").textContent = money(total);
+    const pct = Math.min(100, (sub / C.freeShippingOver) * 100);
+    $("#shipProgress").style.width = pct + "%";
+    $("#shipMsg").textContent = sub >= C.freeShippingOver ? "You've unlocked free delivery 🔥" : `Spend ${money(C.freeShippingOver - sub)} more for free delivery`;
+    $("#checkoutBtn").disabled = !cart.length;
+  }
+  $("#cartItems").addEventListener("click", e => {
+    const t = e.target;
+    if (t.dataset.inc !== undefined) {
+      const l = cart[t.dataset.inc]; const p = products.find(x => x.id === l.id);
+      if (p && l.qty >= (p.sizes[l.size] || 0)) return toast("That's all we've got in that size");
+      l.qty++; saveCart();
+    }
+    if (t.dataset.dec !== undefined) { const l = cart[t.dataset.dec]; l.qty--; if (l.qty < 1) cart.splice(t.dataset.dec, 1); saveCart(); }
+    if (t.dataset.rm !== undefined) { cart.splice(t.dataset.rm, 1); saveCart(); }
+  });
+  $("#checkoutBtn").onclick = async () => {
+    const btn = $("#checkoutBtn"); btn.disabled = true; btn.textContent = "Taking you to checkout…";
+    try {
+      const res = await Store.checkout(cart, $("#checkoutEmail").value.trim());
+      if (res && res.demo) {
+        close("#cartOverlay"); cart = []; saveCart(); showSuccess(true);
+        products = await Store.getProducts(); renderGrid();
+        btn.textContent = "Checkout securely";
+      }
+    }
+    catch (err) { toast(err.message); btn.disabled = false; btn.textContent = "Checkout securely"; }
+  };
+
+  // ---------- overlays ----------
+  function open(sel) { $(sel).hidden = false; document.body.style.overflow = "hidden"; }
+  function close(sel) { $(sel).hidden = true; document.body.style.overflow = ""; }
+  $$(".overlay").forEach(o => o.addEventListener("click", e => {
+    if (e.target === o || e.target.closest("[data-close]")) close("#" + o.id);
+  }));
+  document.addEventListener("keydown", e => { if (e.key === "Escape") $$(".overlay").forEach(o => close("#" + o.id)); });
+  $("#cartBtn").onclick = () => open("#cartOverlay");
+
+  // ---------- filters ----------
+  function setFilter(cat) {
+    filter = cat;
+    $$("#filters .chip").forEach(c => c.classList.toggle("active", c.dataset.cat === cat));
+    renderGrid();
+  }
+  $("#filters").addEventListener("click", e => { if (e.target.dataset.cat) setFilter(e.target.dataset.cat); });
+  $$("[data-filter]").forEach(a => a.addEventListener("click", () => setFilter(a.dataset.filter)));
+  $("#sort").onchange = e => { sort = e.target.value; renderGrid(); };
+  $("#grid").addEventListener("click", e => { const c = e.target.closest(".card"); if (c) openProduct(c.dataset.id); });
+  $("#grid").addEventListener("keydown", e => { const c = e.target.closest(".card"); if (c && e.key === "Enter") openProduct(c.dataset.id); });
+
+  // ---------- newsletter / CRM capture ----------
+  $("#signupForm").onsubmit = async e => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    if (!$("#consent").checked) { $("#signupMsg").textContent = "Tick the box so we can email you."; return; }
+    try {
+      const res = await Store.subscribe(f.get("email").trim(), (f.get("name") || "").trim(), f.get("website") || "");
+      $("#signupMsg").textContent = res && res.demo
+        ? `You're on the list. (Demo mode — no email sent. Your code would be ${C.welcomeCode}.)`
+        : res && res.already ? "You're already on the list — thanks!" : `You're on the list. Check your inbox for ${C.welcomePercent}% off.`;
+      e.target.reset(); $("#consent").checked = false;
+    } catch (err) { $("#signupMsg").textContent = err.message; }
+  };
+
+  // ---------- checkout return ----------
+  const params = new URLSearchParams(location.search);
+  function showSuccess(demo) {
+    document.querySelector(".success")?.remove();
+    $("#shop").insertAdjacentHTML("beforebegin", `<section class="success"><h1>ORDER<br>LOCKED IN.</h1>
+      <p>Thanks for shopping with ${esc(C.brand)}. ${demo ? "(Demo mode — no payment was taken.)" : "Your receipt is on its way to your inbox."}</p>
+      <a href="#shop" class="btn btn-accent">Keep shopping</a></section>`);
+    document.querySelector(".success").scrollIntoView({ behavior: "smooth" });
+  }
+  if (params.get("checkout") === "success") {
+    cart = []; saveCart();
+    showSuccess(false);
+    history.replaceState(null, "", location.pathname);
+  } else if (params.get("checkout") === "cancelled") {
+    toast("Checkout cancelled — your bag is still here.");
+    history.replaceState(null, "", location.pathname);
+  }
+
+  // ---------- boot ----------
+  (async () => {
+    try { products = await Store.getProducts(); }
+    catch (err) { $("#grid").innerHTML = `<p class="empty">Couldn't load products: ${esc(err.message)}</p>`; return; }
+    // refresh cart prices / drop removed products
+    cart = cart.filter(l => products.some(p => p.id === l.id)).map(l => ({ ...l, price: products.find(p => p.id === l.id).price }));
+    renderGrid(); renderCart();
+  })();
+})();

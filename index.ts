@@ -1,0 +1,36 @@
+// Newsletter signup from the shop: saves the customer, syncs to Brevo,
+// and sends the welcome email with the discount code (first signup only).
+import { db, json, cors, sendMarketing, syncBrevoContact, SITE_URL, LOGO_URL } from "../_shared/email.ts";
+import { welcomeEmail } from "../_shared/templates.js";
+
+const CODE = Deno.env.get("WELCOME_CODE") ?? "WELCOME10";
+const PERCENT = Number(Deno.env.get("WELCOME_PERCENT") ?? "10");
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+  try {
+    const { email: raw, name = "", website = "" } = await req.json();
+    if (website) return json({ ok: true }); // honeypot field — bots fill it, humans can't see it
+    const email = String(raw ?? "").trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || email.length > 200) return json({ error: "Please enter a valid email" }, 400);
+    const cleanName = String(name).slice(0, 80);
+
+    const { data: existing } = await db.from("customers").select("marketing_opt_in, welcome_sent_at").eq("email", email).maybeSingle();
+    const { error } = await db.rpc("subscribe", { p_email: email, p_name: cleanName });
+    if (error) throw error;
+    await syncBrevoContact(email, cleanName, true);
+
+    // Only send the welcome email once per address
+    if (!existing?.welcome_sent_at) {
+      const { subject, html } = welcomeEmail({ name: cleanName, code: CODE, percent: PERCENT, shopUrl: SITE_URL, logoUrl: LOGO_URL });
+      try {
+        await sendMarketing(email, cleanName, subject, html, ["welcome"]);
+        await db.from("customers").update({ welcome_sent_at: new Date().toISOString() }).eq("email", email);
+      } catch (e) { console.error("welcome email failed", e); }
+    }
+    return json({ ok: true, already: !!existing?.marketing_opt_in });
+  } catch (e) {
+    console.error(e);
+    return json({ error: "Couldn't sign you up right now — please try again." }, 500);
+  }
+});

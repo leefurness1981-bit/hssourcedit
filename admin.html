@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>HS Sourced It — Admin</title>
+  <link rel="icon" href="images/favicon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Source+Serif+4:opsz,wght@8..60,900&family=Archivo:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body class="admin">
+  <!-- Login -->
+  <section class="login" id="login" hidden>
+    <form id="loginForm" class="login-card">
+      <div class="logo">HS SOURCED IT<span>ADMIN</span></div>
+      <input type="email" name="email" placeholder="Admin email" required>
+      <input type="password" name="password" placeholder="Password" required>
+      <button class="btn btn-accent btn-block">Sign in</button>
+      <p class="small" id="loginMsg"></p>
+    </form>
+  </section>
+
+  <div class="app" id="app" hidden>
+    <aside class="side">
+      <div class="logo">HS SOURCED IT<span>ADMIN</span></div>
+      <nav id="tabs">
+        <button data-tab="dashboard" class="active">Dashboard</button>
+        <button data-tab="stock">Stock</button>
+        <button data-tab="orders">Orders</button>
+        <button data-tab="customers">Customers</button>
+        <button data-tab="email">Email</button>
+        <button data-tab="settings">Settings</button>
+      </nav>
+      <div class="side-foot">
+        <a href="index.html" class="small">← View shop</a>
+        <button class="small" id="signOut">Sign out</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="demo-banner" id="demoBanner" hidden>DEMO MODE — data is stored in this browser only. Add your Supabase keys in <code>js/config.js</code> to go live.</div>
+
+      <!-- Dashboard -->
+      <section data-panel="dashboard">
+        <h1>Dashboard</h1>
+        <div class="kpis" id="kpis"></div>
+        <div class="two">
+          <div class="panel"><h3>Low stock</h3><div id="lowStock"></div></div>
+          <div class="panel"><h3>Recent orders</h3><div id="recentOrders"></div></div>
+        </div>
+      </section>
+
+      <!-- Stock -->
+      <section data-panel="stock" hidden>
+        <div class="head"><h1>Stock</h1><input type="search" id="stockSearch" placeholder="Search products"><button class="btn btn-accent" id="addProduct">+ Add product</button></div>
+        <div class="table-wrap"><table class="tbl" id="stockTable"></table></div>
+      </section>
+
+      <!-- Orders -->
+      <section data-panel="orders" hidden>
+        <div class="head"><h1>Orders</h1>
+          <select id="orderFilter"><option value="">All statuses</option><option>paid</option><option>packed</option><option>shipped</option><option>delivered</option><option>refunded</option></select>
+          <button class="btn btn-ghost" id="exportOrders">Export CSV</button></div>
+        <div class="table-wrap"><table class="tbl" id="ordersTable"></table></div>
+      </section>
+
+      <!-- Customers -->
+      <section data-panel="customers" hidden>
+        <div class="head"><h1>Customers</h1><input type="search" id="custSearch" placeholder="Search name, email or tag">
+          <button class="btn btn-ghost" id="exportCustomers">Export CSV</button>
+          <button class="btn btn-accent" id="addCustomer">+ Add customer</button></div>
+        <div class="table-wrap"><table class="tbl" id="custTable"></table></div>
+      </section>
+
+      <!-- Email -->
+      <section data-panel="email" hidden>
+        <h1>Email campaigns</h1>
+        <div class="two">
+          <form class="panel" id="campaignForm">
+            <h3>New campaign</h3>
+            <label>Send to
+              <select name="segment" id="segment"></select></label>
+            <p class="small" id="segCount"></p>
+            <label>Template
+              <select id="template">
+                <option value="">— Blank —</option>
+                <option value="drop">New drop announcement</option>
+                <option value="restock">Restock alert</option>
+                <option value="sale">Sale / discount code</option>
+              </select></label>
+            <label>Subject <input name="subject" required placeholder="🔥 Drop 05 lands Friday"></label>
+            <label>Message (HTML allowed) <textarea name="html" rows="10" required></textarea></label>
+            <div class="row-btns"><button type="button" class="btn btn-ghost" id="previewBtn">Preview</button><button class="btn btn-accent">Send campaign</button></div>
+            <p class="small">Only customers who opted in to marketing are included. An unsubscribe link is added automatically.</p>
+          </form>
+          <div class="panel">
+            <h3>Automatic emails</h3>
+            <p class="small">These send by themselves. Tap to preview.</p>
+            <div class="auto-emails" id="autoEmails">
+              <button type="button" class="chip" data-auto="welcome">👋 Welcome + discount</button>
+              <button type="button" class="chip" data-auto="order">🧾 Order confirmed</button>
+              <button type="button" class="chip" data-auto="shipped">📦 Order shipped</button>
+            </div>
+            <h3 style="margin-top:.6rem">Preview</h3>
+            <p class="small" id="previewSubject"></p>
+            <iframe id="preview" title="Email preview"></iframe>
+            <h3 style="margin-top:1.5rem">Sent campaigns</h3><div id="campaignList"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Settings -->
+      <section data-panel="settings" hidden>
+        <h1>Settings</h1>
+        <div class="panel">
+          <h3>Status</h3>
+          <p id="modeInfo"></p>
+          <h3 style="margin-top:1.5rem">Backup</h3>
+          <p class="small">Download everything (products, customers, orders) as JSON.</p>
+          <button class="btn btn-ghost" id="backupBtn">Download backup</button>
+          <div id="demoTools">
+            <h3 style="margin-top:1.5rem">Demo data</h3>
+            <button class="btn btn-ghost" id="resetDemo">Reset demo data</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Product editor -->
+  <div class="overlay" id="productEditor" hidden>
+    <form class="modal edit-modal" id="productForm">
+      <button type="button" class="close" data-close>×</button>
+      <h2 id="peTitle">Product</h2>
+      <div class="form-grid">
+        <label>Name <input name="name" required></label>
+        <label>Category
+          <select name="category"><option>trainers</option><option>tracksuits</option><option>hoodies</option><option>tees</option><option>jackets</option><option>accessories</option></select></label>
+        <label>Price (£) <input name="price" type="number" step="0.01" min="0" required></label>
+        <label>Badge <input name="badge" placeholder="New / Sale / Bestseller"></label>
+        <div class="full photo-field">
+          <div class="img-preview" id="imgPreview"></div>
+          <div class="photo-actions">
+            <label class="btn btn-accent upload-btn">📷 Upload photo
+              <input type="file" id="photoInput" accept="image/*" hidden></label>
+            <p class="small" id="uploadMsg">From your phone's camera roll or your computer. Big photos are shrunk automatically.</p>
+            <details><summary class="small">…or paste an image link</summary>
+              <input name="image" placeholder="images/my-trainer.jpg or https://…"></details>
+          </div>
+        </div>
+        <label class="full">Description <textarea name="description" rows="3"></textarea></label>
+        <label class="check"><input type="checkbox" name="active"> Visible in shop</label>
+      </div>
+      <h3>Sizes & stock</h3>
+      <div class="size-presets"><button type="button" class="chip" data-preset="shoe">UK shoe sizes</button><button type="button" class="chip" data-preset="clothing">XS–XXL</button><button type="button" class="chip" data-preset="one">One size</button></div>
+      <div id="sizeRows" class="size-rows"></div>
+      <button type="button" class="small" id="addSize">+ Add size</button>
+      <div class="row-btns"><button type="button" class="btn btn-ghost danger" id="deleteProduct">Delete</button><button class="btn btn-accent">Save product</button></div>
+    </form>
+  </div>
+
+  <!-- Customer editor -->
+  <div class="overlay" id="custEditor" hidden>
+    <form class="modal edit-modal" id="custForm">
+      <button type="button" class="close" data-close>×</button>
+      <h2>Customer</h2>
+      <div class="form-grid">
+        <label>Name <input name="name"></label>
+        <label>Email <input name="email" type="email" required></label>
+        <label>Phone <input name="phone"></label>
+        <label>Tags <input name="tags" placeholder="vip, trainers, local"></label>
+        <label class="full">Notes <textarea name="notes" rows="3"></textarea></label>
+        <label class="check"><input type="checkbox" name="marketing_opt_in"> Opted in to marketing</label>
+      </div>
+      <h3>Order history</h3>
+      <div id="custOrders" class="small"></div>
+      <div class="row-btns"><button type="button" class="btn btn-ghost danger" id="deleteCustomer">Delete</button><button class="btn btn-accent">Save customer</button></div>
+    </form>
+  </div>
+
+  <!-- Mark as shipped -->
+  <div class="overlay" id="shipEditor" hidden>
+    <form class="modal edit-modal ship-modal" id="shipForm">
+      <button type="button" class="close" data-close>×</button>
+      <h2 id="shipTitle">Ship order</h2>
+      <p class="small" id="shipWho"></p>
+      <div class="form-grid">
+        <label>Courier <select name="carrier"></select></label>
+        <label>Tracking number <input name="tracking_number" placeholder="e.g. AB123456789GB" autocomplete="off"></label>
+        <label class="check full"><input type="checkbox" name="notify" checked> Email the customer their tracking details</label>
+      </div>
+      <p class="small" id="shipNote"></p>
+      <div class="row-btns"><button type="button" class="btn btn-ghost" id="previewShip">Preview email</button><button class="btn btn-accent">Mark as shipped</button></div>
+    </form>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="js/config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/data.js"></script>
+  <script src="js/admin.js"></script>
+  <script type="module">
+    import * as T from "./supabase/functions/_shared/templates.js";
+    window.EMAIL_T = T;
+    window.dispatchEvent(new Event("email-templates-ready"));
+  </script>
+</body>
+</html>

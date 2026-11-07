@@ -1,0 +1,341 @@
+(function () {
+  const C = window.SHOP_CONFIG;
+  const { money, esc, imgTag, totalStock } = window.KERB;
+  const $ = s => document.querySelector(s);
+  const $$ = s => [...document.querySelectorAll(s)];
+  let products = [], orders = [], customers = [], campaigns = [];
+
+  let tt;
+  function toast(m) { const t = $("#toast"); t.textContent = m; t.classList.add("show"); clearTimeout(tt); tt = setTimeout(() => t.classList.remove("show"), 2800); }
+  const fmtDate = d => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  const open = s => ($(s).hidden = false);
+  const close = s => ($(s).hidden = true);
+  $$(".overlay").forEach(o => o.addEventListener("click", e => { if (e.target === o || e.target.closest("[data-close]")) close("#" + o.id); }));
+
+  function csv(rows, filename) {
+    const keys = Object.keys(rows[0] || {});
+    const body = [keys.join(","), ...rows.map(r => keys.map(k => `"${String(r[k] ?? "").replace(/"/g, '""')}"`).join(","))].join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([body], { type: "text/csv" })); a.download = filename; a.click();
+  }
+
+  // ---------- auth ----------
+  async function boot() {
+    const session = await Store.session();
+    if (!session) { $("#login").hidden = false; $("#app").hidden = true; return; }
+    $("#login").hidden = true; $("#app").hidden = false;
+    $("#demoBanner").hidden = Store.live;
+    $("#demoTools").hidden = Store.live;
+    $("#modeInfo").innerHTML = Store.live
+      ? `<span class="pill paid">Live</span> Connected to Supabase as <strong>${esc(session.user.email)}</strong>. Payments via Stripe Checkout; emails via Resend.`
+      : `<span class="pill">Demo</span> Running on browser storage. Checkout is simulated and emails are not sent. See README.md to go live.`;
+    await loadAll();
+  }
+  $("#loginForm").onsubmit = async e => {
+    e.preventDefault(); const f = new FormData(e.target);
+    try { await Store.signIn(f.get("email"), f.get("password")); boot(); }
+    catch (err) { $("#loginMsg").textContent = err.message; }
+  };
+  $("#signOut").onclick = async () => { await Store.signOut(); location.reload(); };
+
+  async function loadAll() {
+    try {
+      [products, orders, customers, campaigns] = await Promise.all([
+        Store.getProducts({ includeInactive: true }), Store.getOrders(), Store.getCustomers(), Store.getCampaigns()
+      ]);
+    } catch (err) { toast("Load failed: " + err.message); return; }
+    renderDashboard(); renderStock(); renderOrders(); renderCustomers(); renderEmail();
+  }
+
+  // ---------- tabs ----------
+  $("#tabs").addEventListener("click", e => {
+    const tab = e.target.dataset.tab; if (!tab) return;
+    $$("#tabs button").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+    $$("[data-panel]").forEach(p => (p.hidden = p.dataset.panel !== tab));
+  });
+
+  // ---------- dashboard ----------
+  function renderDashboard() {
+    const paid = orders.filter(o => o.status !== "refunded");
+    const revenue = paid.reduce((a, o) => a + Number(o.total), 0);
+    const month = new Date().toISOString().slice(0, 7);
+    const monthRev = paid.filter(o => o.created_at.startsWith(month)).reduce((a, o) => a + Number(o.total), 0);
+    const units = products.reduce((a, p) => a + totalStock(p), 0);
+    const subs = customers.filter(c => c.marketing_opt_in).length;
+    const toShip = orders.filter(o => o.status === "paid" || o.status === "packed").length;
+    $("#kpis").innerHTML = [
+      ["Revenue (all time)", money(revenue)], ["This month", money(monthRev)], ["Orders to ship", toShip],
+      ["Units in stock", units], ["Customers", customers.length], ["Subscribers", subs]
+    ].map(([l, v]) => `<div class="kpi"><div class="label">${l}</div><div class="val">${v}</div></div>`).join("");
+
+    const low = [];
+    products.forEach(p => Object.entries(p.sizes || {}).forEach(([s, n]) => { if (n <= C.lowStockThreshold) low.push({ p, s, n }); }));
+    $("#lowStock").innerHTML = low.length ? low.sort((a, b) => a.n - b.n).slice(0, 12).map(({ p, s, n }) =>
+      `<div class="mini"><span>${esc(p.name)} — ${esc(s)}</span><span class="pill ${n === 0 ? "refunded" : "packed"}">${n === 0 ? "Out" : n + " left"}</span></div>`).join("")
+      : `<p class="small">All sizes healthy.</p>`;
+    $("#recentOrders").innerHTML = orders.length ? orders.slice(0, 6).map(o =>
+      `<div class="mini"><span>${esc(o.id)} · ${esc(o.customer_email)}</span><span>${money(o.total)} <span class="pill ${o.status}">${o.status}</span></span></div>`).join("")
+      : `<p class="small">No orders yet.</p>`;
+  }
+
+  // ---------- stock ----------
+  function renderStock() {
+    const term = $("#stockSearch").value.toLowerCase();
+    const list = products.filter(p => (p.name + p.category).toLowerCase().includes(term));
+    $("#stockTable").innerHTML = `<thead><tr><th></th><th>Product</th><th>Price</th><th>Stock by size (edit inline)</th><th>Total</th><th>Status</th></tr></thead><tbody>` +
+      list.map(p => `<tr>
+        <td>${imgTag(p.image, p.name, "thumb")}</td>
+        <td><a href="#" data-edit="${esc(p.id)}"><strong>${esc(p.name)}</strong></a><div class="small">${esc(p.category)}</div></td>
+        <td>${money(p.price)}</td>
+        <td><div class="stock-cells">${Object.entries(p.sizes || {}).map(([s, n]) =>
+          `<label class="sc ${n == 0 ? "zero" : n <= C.lowStockThreshold ? "low" : ""}"><small>${esc(s)}</small><input type="number" min="0" value="${n}" data-pid="${esc(p.id)}" data-size="${esc(s)}"></label>`).join("")}</div></td>
+        <td><strong>${totalStock(p)}</strong></td>
+        <td>${p.active ? '<span class="pill on">Live</span>' : '<span class="pill">Hidden</span>'}</td></tr>`).join("") + "</tbody>";
+  }
+  $("#stockSearch").oninput = renderStock;
+  $("#stockTable").addEventListener("change", async e => {
+    const i = e.target; if (!i.dataset.pid) return;
+    const p = products.find(x => x.id === i.dataset.pid);
+    p.sizes = { ...p.sizes, [i.dataset.size]: Math.max(0, parseInt(i.value || 0, 10)) };
+    try { await Store.saveProduct(p); toast(`Stock updated: ${p.name} ${i.dataset.size} → ${p.sizes[i.dataset.size]}`); renderStock(); renderDashboard(); }
+    catch (err) { toast(err.message); }
+  });
+  $("#stockTable").addEventListener("click", e => { const a = e.target.closest("[data-edit]"); if (a) { e.preventDefault(); editProduct(a.dataset.edit); } });
+  $("#addProduct").onclick = () => editProduct(null);
+
+  const PRESETS = {
+    shoe: ["UK 6", "UK 7", "UK 8", "UK 9", "UK 10", "UK 11"],
+    clothing: ["XS", "S", "M", "L", "XL", "XXL"],
+    one: ["One size"]
+  };
+  function sizeRow(s = "", n = 0) {
+    return `<div class="size-row"><input placeholder="Size" value="${esc(s)}"><input type="number" min="0" value="${n}"><button type="button" data-rmsize>×</button></div>`;
+  }
+  function editProduct(id) {
+    const p = products.find(x => x.id === id) || { name: "", category: "trainers", price: "", badge: "", image: "", description: "", active: true, sizes: Object.fromEntries(PRESETS.shoe.map(s => [s, 0])) };
+    const f = $("#productForm");
+    f.dataset.id = p.id || "";
+    $("#peTitle").textContent = p.id ? "Edit product" : "New product";
+    ["name", "category", "price", "badge", "image", "description"].forEach(k => (f.elements[k].value = p[k] ?? ""));
+    f.elements.active.checked = !!p.active;
+    $("#sizeRows").innerHTML = Object.entries(p.sizes || {}).map(([s, n]) => sizeRow(s, n)).join("");
+    $("#deleteProduct").hidden = !p.id;
+    previewImg();
+    open("#productEditor");
+  }
+  function previewImg() { const v = $("#productForm").elements.image.value; $("#imgPreview").innerHTML = imgTag(v, $("#productForm").elements.name.value || "Preview"); }
+  $("#productForm").elements.image.oninput = previewImg;
+  $("#photoInput").onchange = async e => {
+    const file = e.target.files[0]; if (!file) return;
+    const msg = $("#uploadMsg"); const btn = $(".upload-btn");
+    msg.textContent = "Uploading…"; btn.style.opacity = .5;
+    try {
+      const url = await Store.uploadImage(file);
+      $("#productForm").elements.image.value = url;
+      previewImg();
+      msg.textContent = "Photo added ✓ — remember to Save product.";
+    } catch (err) { msg.textContent = "Upload failed: " + err.message; }
+    btn.style.opacity = 1; e.target.value = "";
+  };
+  $("#addSize").onclick = () => $("#sizeRows").insertAdjacentHTML("beforeend", sizeRow());
+  $("#sizeRows").addEventListener("click", e => { if (e.target.dataset.rmsize !== undefined) e.target.parentElement.remove(); });
+  $$("[data-preset]").forEach(b => b.onclick = () => ($("#sizeRows").innerHTML = PRESETS[b.dataset.preset].map(s => sizeRow(s, 0)).join("")));
+  $("#productForm").onsubmit = async e => {
+    e.preventDefault();
+    const f = e.target;
+    const sizes = {};
+    $$("#sizeRows .size-row").forEach(r => { const [s, n] = r.querySelectorAll("input"); if (s.value.trim()) sizes[s.value.trim()] = Math.max(0, parseInt(n.value || 0, 10)); });
+    const p = { ...(products.find(x => x.id === f.dataset.id) || {}), id: f.dataset.id || undefined,
+      name: f.elements.name.value.trim(), category: f.elements.category.value, price: Number(f.elements.price.value),
+      badge: f.elements.badge.value.trim(), image: f.elements.image.value.trim(), description: f.elements.description.value.trim(),
+      active: f.elements.active.checked, sizes };
+    if (!p.id) delete p.id;
+    try { await Store.saveProduct(p); close("#productEditor"); toast("Product saved"); loadAll(); }
+    catch (err) { toast(err.message); }
+  };
+  $("#deleteProduct").onclick = async () => {
+    const id = $("#productForm").dataset.id;
+    if (!id || !confirm("Delete this product permanently? (Tip: untick 'Visible' to hide it instead.)")) return;
+    await Store.deleteProduct(id); close("#productEditor"); toast("Product deleted"); loadAll();
+  };
+
+  // ---------- orders ----------
+  const STATUSES = ["paid", "packed", "shipped", "delivered", "refunded"];
+  function trackCell(o) {
+    if (!o.tracking_number) return o.status === "shipped" || o.status === "delivered" ? `<button class="small link" data-ship="${esc(o.id)}">+ Add tracking</button>` : "";
+    const url = window.EMAIL_T ? window.EMAIL_T.trackingUrl(o.carrier, o.tracking_number) : "";
+    const num = url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(o.tracking_number)}</a>` : esc(o.tracking_number);
+    return `<div class="small">${esc(o.carrier || "")}</div>${num} <button class="small link" data-ship="${esc(o.id)}">edit</button>`;
+  }
+  function renderOrders() {
+    const st = $("#orderFilter").value;
+    const list = orders.filter(o => !st || o.status === st);
+    $("#ordersTable").innerHTML = `<thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th>Tracking</th></tr></thead><tbody>` +
+      (list.length ? list.map(o => `<tr>
+        <td><strong>${esc(o.id)}</strong></td><td>${fmtDate(o.created_at)}</td>
+        <td>${esc(o.customer_name || "")}<div class="small">${esc(o.customer_email)}</div>${o.shipping_address ? `<div class="small">${esc(o.shipping_address)}</div>` : ""}</td>
+        <td>${(o.items || []).map(i => `${i.qty}× ${esc(i.name)} <span class="small">(${esc(i.size)})</span>`).join("<br>")}</td>
+        <td>${money(o.total)}</td>
+        <td><select data-oid="${esc(o.id)}">${STATUSES.map(s => `<option ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}</select></td>
+        <td>${trackCell(o)}</td></tr>`).join("")
+      : `<tr><td colspan="7" class="small">No orders.</td></tr>`) + "</tbody>";
+  }
+  $("#orderFilter").onchange = renderOrders;
+  $("#ordersTable").addEventListener("change", async e => {
+    const id = e.target.dataset.oid; if (!id) return;
+    const o = orders.find(x => x.id === id);
+    if (e.target.value === "shipped") { e.target.value = o.status; return openShip(o); }
+    try { await Store.updateOrder(id, { status: e.target.value, carrier: o.carrier || "", tracking_number: o.tracking_number || "" }); o.status = e.target.value; toast(`${id} marked ${e.target.value}`); renderOrders(); renderDashboard(); }
+    catch (err) { toast(err.message); }
+  });
+  $("#ordersTable").addEventListener("click", e => { const b = e.target.closest("[data-ship]"); if (b) openShip(orders.find(o => o.id === b.dataset.ship)); });
+
+  // "Mark as shipped" dialog
+  function openShip(o) {
+    const f = $("#shipForm"); f.dataset.id = o.id;
+    $("#shipTitle").textContent = `Ship ${o.id}`;
+    $("#shipWho").textContent = `${o.customer_name || ""} ${o.customer_email}`.trim();
+    const names = window.EMAIL_T ? window.EMAIL_T.CARRIER_NAMES : ["Royal Mail", "Evri", "DPD", "DHL", "UPS", "Parcelforce", "Yodel", "Other"];
+    f.elements.carrier.innerHTML = names.map(n => `<option ${n === (o.carrier || "Royal Mail") ? "selected" : ""}>${n}</option>`).join("");
+    f.elements.tracking_number.value = o.tracking_number || "";
+    f.elements.notify.checked = o.status !== "shipped" && o.status !== "delivered";
+    $("#shipNote").textContent = Store.live ? "" : "Demo mode — no email will actually be sent.";
+    open("#shipEditor");
+  }
+  $("#previewShip").onclick = () => {
+    const f = $("#shipForm"); const o = orders.find(x => x.id === f.dataset.id);
+    showAutoPreview("shipped", { orderId: o.id, name: o.customer_name, items: o.items, carrier: f.elements.carrier.value, trackingNumber: f.elements.tracking_number.value });
+    close("#shipEditor");
+    $$("#tabs button").forEach(b => b.classList.toggle("active", b.dataset.tab === "email"));
+    $$("[data-panel]").forEach(p => (p.hidden = p.dataset.panel !== "email"));
+  };
+  $("#shipForm").onsubmit = async e => {
+    e.preventDefault(); const f = e.target; const o = orders.find(x => x.id === f.dataset.id);
+    const patch = { status: "shipped", carrier: f.elements.carrier.value, tracking_number: f.elements.tracking_number.value.trim() };
+    const btn = f.querySelector("button.btn-accent"); btn.disabled = true;
+    try {
+      const res = await Store.updateOrder(o.id, patch, f.elements.notify.checked);
+      Object.assign(o, patch);
+      close("#shipEditor"); renderOrders(); renderDashboard();
+      toast(res.emailed ? `${o.id} shipped — customer emailed ✓` : res.demo && f.elements.notify.checked ? `${o.id} shipped (demo: email not sent)` : `${o.id} marked shipped`);
+    } catch (err) { toast(err.message); }
+    btn.disabled = false;
+  };
+  $("#exportOrders").onclick = () => csv(orders.map(o => ({ id: o.id, date: o.created_at, email: o.customer_email, name: o.customer_name, total: o.total, status: o.status,
+    items: (o.items || []).map(i => `${i.qty}x ${i.name} (${i.size})`).join("; ") })), "orders.csv");
+
+  // ---------- customers / CRM ----------
+  function renderCustomers() {
+    const term = $("#custSearch").value.toLowerCase();
+    const list = customers.filter(c => [c.name, c.email, (c.tags || []).join(" ")].join(" ").toLowerCase().includes(term));
+    $("#custTable").innerHTML = `<thead><tr><th>Customer</th><th>Tags</th><th>Orders</th><th>Spent</th><th>Marketing</th><th>Joined</th></tr></thead><tbody>` +
+      (list.length ? list.map(c => `<tr class="click" data-email="${esc(c.email)}">
+        <td><strong>${esc(c.name || "—")}</strong><div class="small">${esc(c.email)}</div></td>
+        <td>${(c.tags || []).map(t => `<span class="tag">${esc(t)}</span>`).join("")}</td>
+        <td>${c.order_count || 0}</td><td>${money(c.total_spent)}</td>
+        <td>${c.marketing_opt_in ? '<span class="pill on">Subscribed</span>' : '<span class="pill">No</span>'}</td>
+        <td>${fmtDate(c.created_at)}</td></tr>`).join("")
+      : `<tr><td colspan="6" class="small">No customers yet.</td></tr>`) + "</tbody>";
+  }
+  $("#custSearch").oninput = renderCustomers;
+  $("#custTable").addEventListener("click", e => { const r = e.target.closest("[data-email]"); if (r) editCustomer(r.dataset.email); });
+  $("#addCustomer").onclick = () => editCustomer(null);
+  function editCustomer(email) {
+    const c = customers.find(x => x.email === email) || { name: "", email: "", phone: "", tags: [], notes: "", marketing_opt_in: false };
+    const f = $("#custForm"); f.dataset.email = c.email;
+    ["name", "email", "phone", "notes"].forEach(k => (f.elements[k].value = c[k] || ""));
+    f.elements.tags.value = (c.tags || []).join(", ");
+    f.elements.marketing_opt_in.checked = !!c.marketing_opt_in;
+    const theirs = orders.filter(o => o.customer_email === c.email);
+    $("#custOrders").innerHTML = theirs.length ? theirs.map(o => `<div class="mini"><span>${esc(o.id)} · ${fmtDate(o.created_at)}</span><span>${money(o.total)} <span class="pill ${o.status}">${o.status}</span></span></div>`).join("") : "No orders yet.";
+    $("#deleteCustomer").hidden = !c.email;
+    open("#custEditor");
+  }
+  $("#custForm").onsubmit = async e => {
+    e.preventDefault(); const f = e.target;
+    const existing = customers.find(x => x.email === f.dataset.email) || {};
+    const c = { ...existing, name: f.elements.name.value.trim(), email: f.elements.email.value.trim().toLowerCase(), phone: f.elements.phone.value.trim(),
+      tags: f.elements.tags.value.split(",").map(t => t.trim().toLowerCase()).filter(Boolean), notes: f.elements.notes.value, marketing_opt_in: f.elements.marketing_opt_in.checked };
+    try { await Store.saveCustomer(c); close("#custEditor"); toast("Customer saved"); loadAll(); } catch (err) { toast(err.message); }
+  };
+  $("#deleteCustomer").onclick = async () => {
+    const email = $("#custForm").dataset.email;
+    if (!email || !confirm(`Delete ${email} and their CRM record?`)) return;
+    await Store.deleteCustomer(email); close("#custEditor"); toast("Customer deleted"); loadAll();
+  };
+  $("#exportCustomers").onclick = () => csv(customers.map(c => ({ name: c.name, email: c.email, phone: c.phone, tags: (c.tags || []).join(" "), orders: c.order_count, spent: c.total_spent, marketing: c.marketing_opt_in, notes: c.notes })), "customers.csv");
+
+  // ---------- email ----------
+  const TEMPLATES = {
+    drop: { subject: "🔥 New drop lands Friday", html: `<h1>New drop. Friday 7pm.</h1>\n<p>Fresh trainers and tracksuits are landing this Friday. Subscribers get first access.</p>\n<p><a href="SHOP_URL" class="btn">Shop the drop</a></p>` },
+    restock: { subject: "It's back. Restock just landed.", html: `<h1>Back in stock.</h1>\n<p>The pieces you missed are back — but not for long. Sizes are limited.</p>\n<p><a href="SHOP_URL" class="btn">Grab yours</a></p>` },
+    sale: { subject: "20% off this weekend only", html: `<h1>20% off. 48 hours.</h1>\n<p>Use code <strong>HS20</strong> at checkout. Ends Sunday midnight.</p>\n<p><a href="SHOP_URL" class="btn">Shop the sale</a></p>` }
+  };
+  const shopUrl = () => location.origin + location.pathname.replace(/admin\.html$/, "");
+  const logoUrl = () => shopUrl() + "images/logo.png";
+  const fakeUnsub = h => h.replace("{{unsubscribe}}", '<a href="#" style="color:#999">Unsubscribe</a>');
+  function wrapEmail(inner) {
+    if (!window.EMAIL_T) return inner;
+    return window.EMAIL_T.campaignEmail({ inner, shopUrl: shopUrl(), logoUrl: logoUrl() });
+  }
+  // Previews of the automatic emails
+  const SAMPLE_ITEMS = [{ name: "Travis Scott x Jordan 1 Low 'Olive'", size: "UK 9", qty: 1, price: 220 }];
+  function showAutoPreview(kind, data = {}) {
+    const T = window.EMAIL_T; if (!T) return toast("Email designs still loading — try again");
+    const base = { shopUrl: shopUrl(), logoUrl: logoUrl() };
+    const e = kind === "welcome" ? T.welcomeEmail({ ...base, name: "Jayden", code: C.welcomeCode, percent: C.welcomePercent, ...data })
+      : kind === "order" ? T.orderConfirmedEmail({ ...base, orderId: "ORD-7F3K2Q", name: "Jayden Reid", items: SAMPLE_ITEMS, total: 220, address: "12 High Street, Leeds, LS1 4AB", ...data })
+      : T.orderShippedEmail({ ...base, orderId: "ORD-7F3K2Q", name: "Jayden Reid", items: SAMPLE_ITEMS, carrier: "Royal Mail", trackingNumber: "AB123456789GB", ...data });
+    $("#preview").srcdoc = fakeUnsub(e.html);
+    $("#previewSubject").textContent = "Subject: " + e.subject;
+  }
+  $("#autoEmails").addEventListener("click", e => { const k = e.target.dataset.auto; if (k) showAutoPreview(k); });
+  function segments() {
+    const tags = new Set(); customers.forEach(c => (c.tags || []).forEach(t => tags.add(t)));
+    return ["all", ...tags];
+  }
+  function segCount() {
+    const s = $("#segment").value;
+    const n = customers.filter(c => c.marketing_opt_in && (s === "all" || (c.tags || []).includes(s))).length;
+    $("#segCount").textContent = `${n} subscribed recipient${n === 1 ? "" : "s"}`;
+  }
+  function renderEmail() {
+    const cur = $("#segment").value || "all";
+    $("#segment").innerHTML = segments().map(s => `<option value="${esc(s)}" ${s === cur ? "selected" : ""}>${s === "all" ? "All subscribers" : "Tag: " + esc(s)}</option>`).join("");
+    segCount();
+    $("#campaignList").innerHTML = campaigns.length ? campaigns.map(c => `<div class="mini"><span>${esc(c.subject)}<div class="small">${fmtDate(c.created_at)} · ${esc(c.segment)}</div></span><span>${c.recipients} sent ${c.status ? `<span class="pill">${esc(c.status)}</span>` : ""}</span></div>`).join("") : `<p class="small">No campaigns yet.</p>`;
+  }
+  $("#segment").onchange = segCount;
+  $("#template").onchange = e => { const t = TEMPLATES[e.target.value]; if (!t) return; const f = $("#campaignForm"); f.elements.subject.value = t.subject; f.elements.html.value = t.html; preview(); };
+  function preview() { $("#preview").srcdoc = fakeUnsub(wrapEmail($("#campaignForm").elements.html.value)); $("#previewSubject").textContent = "Subject: " + ($("#campaignForm").elements.subject.value || "—"); }
+  $("#previewBtn").onclick = preview;
+  $("#campaignForm").elements.html.oninput = preview;
+  $("#campaignForm").onsubmit = async e => {
+    e.preventDefault(); const f = e.target;
+    const segment = $("#segment").value;
+    const n = parseInt($("#segCount").textContent, 10) || 0;
+    const warn = n > 300 ? `\n\nHeads up: Brevo's free plan sends 300 emails a day, so only about 300 will go today.` : "";
+    if (!confirm(`Send "${f.elements.subject.value}" to ${$("#segCount").textContent}?${warn}`)) return;
+    try {
+      const res = await Store.sendCampaign({ subject: f.elements.subject.value, inner: f.elements.html.value, html: wrapEmail(f.elements.html.value), segment });
+      if (res.demo) {
+        toast(`Demo: would send to ${res.sent}. Recipient list copied to clipboard.`);
+        navigator.clipboard?.writeText(res.emails.join(", ")).catch(() => {});
+      } else if (res.limitHit) toast(`Sent ${res.sent} of ${res.total} — Brevo's daily limit was reached.`);
+      else toast(`Sent to ${res.sent} subscribers${res.failed ? ` (${res.failed} failed)` : ""}`);
+      f.reset(); preview(); campaigns = await Store.getCampaigns(); renderEmail();
+    } catch (err) { toast(err.message); }
+  };
+
+  // ---------- settings ----------
+  $("#backupBtn").onclick = async () => {
+    const data = await Store.exportAll();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+    a.download = `hs-sourced-it-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click();
+  };
+  $("#resetDemo").onclick = () => { if (confirm("Reset all demo data?")) { Store.resetDemo(); location.reload(); } };
+
+  window.addEventListener("email-templates-ready", () => { if (orders.length) renderOrders(); });
+  boot();
+})();

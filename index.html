@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HS Sourced It — Trainers & Tracksuits</title>
+  <meta name="description" content="Trainers, tracksuits, hoodies and tees. Fresh drops, fast UK delivery.">
+  <meta property="og:title" content="HS Sourced It">
+  <meta property="og:image" content="images/logo.png">
+  <link rel="icon" href="images/favicon.png">
+  <link rel="apple-touch-icon" href="images/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Source+Serif+4:opsz,wght@8..60,900&family=Archivo:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="ticker" aria-hidden="true"><div class="ticker-track" id="ticker"></div></div>
+
+  <header class="nav">
+    <a href="#" class="logo" id="logo">HS SOURCED IT</a>
+    <nav class="nav-links">
+      <a href="#shop" data-filter="trainers">Trainers</a>
+      <a href="#shop" data-filter="tracksuits">Tracksuits</a>
+      <a href="#shop" data-filter="hoodies">Hoodies</a>
+      <a href="#shop" data-filter="jackets">Jackets</a>
+      <a href="#shop" data-filter="tees">Tees</a>
+    </nav>
+    <button class="cart-btn" id="cartBtn" aria-label="Open bag">BAG <span id="cartCount">0</span></button>
+  </header>
+
+  <section class="hero hero-brand" id="hero">
+    <div class="hero-copy">
+      <h1 class="sr-only">HS Sourced It</h1>
+      <img class="hero-mark" id="heroLogo" src="images/logo.png" alt="HS Sourced It logo — trainers and shopping bags">
+      <p class="hero-sub" id="tagline"></p>
+      <div class="hero-ctas">
+        <a href="#shop" class="btn btn-accent" data-filter="trainers">Shop trainers</a>
+        <a href="#shop" class="btn btn-ghost" data-filter="tracksuits">Shop tracksuits</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="usp">
+    <div><strong>Free delivery</strong><span id="freeShip"></span></div>
+    <div><strong>Secure checkout</strong><span>Powered by Stripe</span></div>
+  </section>
+
+  <section class="shop" id="shop">
+    <div class="shop-head">
+      <h2>THE DROP</h2>
+      <div class="filters" id="filters">
+        <button class="chip active" data-cat="all">All</button>
+        <button class="chip" data-cat="trainers">Trainers</button>
+        <button class="chip" data-cat="tracksuits">Tracksuits</button>
+        <button class="chip" data-cat="hoodies">Hoodies</button>
+        <button class="chip" data-cat="jackets">Jackets</button>
+        <button class="chip" data-cat="tees">Tees</button>
+      </div>
+      <select id="sort" aria-label="Sort">
+        <option value="featured">Featured</option>
+        <option value="low">Price: low → high</option>
+        <option value="high">Price: high → low</option>
+      </select>
+    </div>
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <section class="lookbook">
+    <a href="#shop" data-filter="trainers" class="look look-a" id="lookA"><div class="look-label">FRESH<br>PAIRS</div></a>
+    <a href="#shop" data-filter="tracksuits" class="look look-b" id="lookB"><div class="look-label">FULL<br>SETS</div></a>
+  </section>
+
+  <section class="signup" id="signup">
+    <h2>GET FIRST DIBS.</h2>
+    <p>Drops sell out. Join the list for early access, restocks and <span id="welcomePct">10</span>% off your first order.</p>
+    <form id="signupForm" class="signup-form">
+      <input type="text" name="name" placeholder="First name" autocomplete="given-name">
+      <input type="email" name="email" placeholder="Email address" required autocomplete="email">
+      <input type="text" name="website" tabindex="-1" autocomplete="off" class="hp" aria-hidden="true">
+      <button class="btn btn-accent" type="submit">I'm in</button>
+    </form>
+    <label class="consent"><input type="checkbox" id="consent" required form="signupForm"> I agree to receive marketing emails. Unsubscribe anytime.</label>
+    <p class="form-msg" id="signupMsg"></p>
+  </section>
+
+  <footer class="footer">
+    <img class="foot-logo" src="images/logo.png" alt="HS Sourced It">
+    <div class="foot-links">
+      <a id="contactLink" href="#">Contact</a>
+      <a id="igLink" href="#" target="_blank" rel="noopener">Instagram</a>
+      <a id="ttLink" href="#" target="_blank" rel="noopener">TikTok</a>
+      <a href="admin.html">Staff</a>
+    </div>
+    <p class="small">© <span id="year"></span> HS Sourced It. All rights reserved.</p>
+  </footer>
+
+  <!-- Product modal -->
+  <div class="overlay" id="productOverlay" hidden>
+    <div class="modal product-modal" role="dialog" aria-modal="true">
+      <button class="close" data-close aria-label="Close">×</button>
+      <div id="productBody"></div>
+    </div>
+  </div>
+
+  <!-- Cart drawer -->
+  <div class="overlay" id="cartOverlay" hidden>
+    <aside class="drawer" role="dialog" aria-modal="true" aria-label="Your bag">
+      <div class="drawer-head"><h3>YOUR BAG</h3><button class="close" data-close aria-label="Close">×</button></div>
+      <div class="drawer-body" id="cartItems"></div>
+      <div class="drawer-foot">
+        <div class="ship-bar"><div id="shipProgress"></div></div>
+        <p class="small" id="shipMsg"></p>
+        <div class="row"><span>Subtotal</span><strong id="subtotal"></strong></div>
+        <div class="row"><span>Delivery</span><strong id="shipping"></strong></div>
+        <div class="row total"><span>Total</span><strong id="total"></strong></div>
+        <input type="email" id="checkoutEmail" placeholder="Email for your receipt (optional)">
+        <button class="btn btn-accent btn-block" id="checkoutBtn">Checkout securely</button>
+        <p class="small center">Payments handled by Stripe. Cards, Apple Pay & Google Pay.</p>
+      </div>
+    </aside>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="js/config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/data.js"></script>
+  <script src="js/shop.js"></script>
+</body>
+</html>
