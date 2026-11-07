@@ -185,3 +185,6 @@ select { background: var(--panel); border: 1px solid var(--line); padding: .5rem
 .pm-img { background: #111; }
 
 .hp { position: absolute !important; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+
+.order-num { margin: 1.4rem auto 0 !important; color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .15em; }
+.order-num strong { display: block; color: var(--text); font-size: 1.6rem; letter-spacing: .08em; margin-top: .3rem; font-family: var(--body); }

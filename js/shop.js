@@ -125,9 +125,9 @@
   $("#checkoutBtn").onclick = async () => {
     const btn = $("#checkoutBtn"); btn.disabled = true; btn.textContent = "Taking you to checkout…";
     try {
-      const res = await Store.checkout(cart, $("#checkoutEmail").value.trim());
+      const res = await Store.checkout(cart);
       if (res && res.demo) {
-        close("#cartOverlay"); cart = []; saveCart(); showSuccess(true);
+        close("#cartOverlay"); cart = []; saveCart(); showSuccess(true, res.order && res.order.id);
         products = await Store.getProducts(); renderGrid();
         btn.textContent = "Checkout securely";
       }
@@ -172,16 +172,21 @@
 
   // ---------- checkout return ----------
   const params = new URLSearchParams(location.search);
-  function showSuccess(demo) {
+  function showSuccess(demo, orderId) {
     document.querySelector(".success")?.remove();
+    const num = orderId ? `<p class="order-num">Order number<strong>${esc(orderId)}</strong></p>` : "";
     $("#shop").insertAdjacentHTML("beforebegin", `<section class="success"><h1>ORDER<br>LOCKED IN.</h1>
-      <p>Thanks for shopping with ${esc(C.brand)}. ${demo ? "(Demo mode — no payment was taken.)" : "Your receipt is on its way to your inbox."}</p>
+      ${num}
+      <p>Thanks for shopping with ${esc(C.brand)}. ${demo ? "(Demo mode — no payment was taken.)" : "Your confirmation email is on its way — check your spam folder if it's not there in a few minutes."}</p>
       <a href="#shop" class="btn btn-accent">Keep shopping</a></section>`);
     document.querySelector(".success").scrollIntoView({ behavior: "smooth" });
   }
+
   if (params.get("checkout") === "success") {
     cart = []; saveCart();
-    showSuccess(false);
+    // Same order number the confirmation email and admin use: ORD- + last 8 characters of the Stripe session ID
+    const sid = params.get("session_id") || "";
+    showSuccess(false, sid ? "ORD-" + sid.slice(-8).toUpperCase() : "");
     history.replaceState(null, "", location.pathname);
   } else if (params.get("checkout") === "cancelled") {
     toast("Checkout cancelled — your bag is still here.");

@@ -242,7 +242,7 @@
       if (LIVE) {
         const { url } = await fn("create-checkout", {
           items: cart.map(({ id, size, qty }) => ({ id, size, qty })), email,
-          success_url: location.origin + location.pathname + "?checkout=success",
+          success_url: location.origin + location.pathname + "?checkout=success&session_id={CHECKOUT_SESSION_ID}",
           cancel_url: location.origin + location.pathname + "?checkout=cancelled"
         });
         location.href = url;
