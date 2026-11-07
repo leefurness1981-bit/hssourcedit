@@ -30,6 +30,27 @@ const cors = {
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
+/** Plain-text version of an HTML email (sent alongside the HTML — helps spam filters trust it). */
+function htmlToText(html: string): string {
+  const decode = (t: string) => t
+    .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&pound;/g, "£");
+  let t = html
+    .replace(/<head[\s\S]*?<\/head>/gi, "")
+    .replace(/<div style="display:none[\s\S]*?<\/div>/i, "")
+    .replace(/<img[^>]*alt="([^"]*)"[^>]*>/gi, "$1\n")
+    .replace(/<a [^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi, (_m, href, inner) => {
+      const label = decode(inner.replace(/<[^>]+>/g, "").trim());
+      return !label || label === href ? href : `${label}: ${href}`;
+    })
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|h1|h2|h3|div|tr|table)>/gi, "\n\n")
+    .replace(/<\/td>/gi, "  ")
+    .replace(/<[^>]+>/g, "");
+  t = decode(t).split("\n").map((l) => l.replace(/[ \t]+/g, " ").trim()).join("\n");
+  return t.replace(/\n{3,}/g, "\n\n").trim();
+}
+
 type Mail = {
   to: string; name?: string; subject: string; html: string;
   kind: "marketing" | "transactional"; headers?: Record<string, string>; tags?: string[];
@@ -46,7 +67,7 @@ async function sendEmail(m: Mail): Promise<void> {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: `${FROM_NAME} <${from}>`, to: m.to, reply_to: REPLY_TO, subject: m.subject, html: m.html, headers: m.headers }),
+      body: JSON.stringify({ from: `${FROM_NAME} <${from}>`, to: m.to, reply_to: REPLY_TO, subject: m.subject, html: m.html, text: htmlToText(m.html), headers: m.headers }),
     });
     if (res.status === 429) throw new SendLimitError("Resend sending limit reached");
     if (!res.ok) throw new Error(`Resend: ${await res.text()}`);
@@ -61,7 +82,7 @@ async function sendEmail(m: Mail): Promise<void> {
       sender: { name: FROM_NAME, email: from },
       to: [{ email: m.to, ...(m.name ? { name: m.name } : {}) }],
       replyTo: { email: REPLY_TO, name: FROM_NAME },
-      subject: m.subject, htmlContent: m.html, headers: m.headers, tags: m.tags,
+      subject: m.subject, htmlContent: m.html, textContent: htmlToText(m.html), headers: m.headers, tags: m.tags,
     }),
   });
   if (res.ok) return;
