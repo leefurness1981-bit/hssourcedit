@@ -276,22 +276,29 @@ Deno.serve(async (req) => {
     return new Response(`Bad signature: ${(e as Error).message}`, { status: 400 });
   }
 
+  console.log(`Stripe event ${event.type} (${event.id})`);
+
   if (event.type === "checkout.session.completed") {
+   try {
     const s = event.data.object as Stripe.Checkout.Session;
+    console.log(`Session ${s.id}: payment_status=${s.payment_status}, email=${s.customer_details?.email}, metadata=${s.metadata?.items}`);
 
     // Idempotency: Stripe can retry webhooks
-    const { data: existing } = await db.from("orders").select("id").eq("stripe_session_id", s.id).maybeSingle();
-    if (existing) return new Response("already processed");
+    const { data: existing, error: exErr } = await db.from("orders").select("id").eq("stripe_session_id", s.id).maybeSingle();
+    if (exErr) throw new Error("Reading orders failed: " + exErr.message);
+    if (existing) { console.log("Already processed", existing.id); return new Response("already processed"); }
 
     const meta: { id: string; size: string; qty: number }[] = JSON.parse(s.metadata?.items ?? "[]");
-    const { data: products } = await db.from("products").select("id,name,price").in("id", meta.map((m) => m.id));
+    const { data: products, error: prErr } = await db.from("products").select("id,name,price").in("id", meta.map((m) => m.id));
+    if (prErr) throw new Error("Reading products failed: " + prErr.message);
     const items = meta.map((m) => {
       const p = products?.find((x) => x.id === m.id);
       return { id: m.id, name: p?.name ?? m.id, size: m.size, qty: m.qty, price: Number(p?.price ?? 0) };
     });
 
     for (const m of meta) {
-      await db.rpc("decrement_stock", { p_id: m.id, p_size: m.size, p_qty: m.qty });
+      const { error } = await db.rpc("decrement_stock", { p_id: m.id, p_size: m.size, p_qty: m.qty });
+      if (error) console.error("Stock update failed", m, error.message);
     }
 
     const email = (s.customer_details?.email ?? "").toLowerCase();
@@ -303,27 +310,37 @@ Deno.serve(async (req) => {
     const total = (s.amount_total ?? 0) / 100;
     const orderId = "ORD-" + s.id.slice(-8).toUpperCase();
 
-    await db.from("orders").insert({
+    const { error: orderErr } = await db.from("orders").insert({
       id: orderId, stripe_session_id: s.id, customer_email: email, customer_name: name,
       shipping_address: address, items, total, status: "paid",
     });
+    if (orderErr) throw new Error("Saving order failed: " + orderErr.message);
+    console.log("Order saved", orderId, email, total);
 
     // CRM upsert
     const { data: c } = await db.from("customers").select("*").eq("email", email).maybeSingle();
     if (c) {
-      await db.from("customers").update({
+      const { error: cuErr } = await db.from("customers").update({
         name: c.name || name, phone: c.phone || s.customer_details?.phone || "",
         total_spent: Number(c.total_spent) + total, order_count: c.order_count + 1,
       }).eq("email", email);
+      if (cuErr) console.error("Customer update failed", cuErr.message);
     } else {
-      await db.from("customers").insert({ email, name, phone: s.customer_details?.phone ?? "", total_spent: total, order_count: 1, tags: ["customer"] });
+      const { error: ciErr } = await db.from("customers").insert({ email, name, phone: s.customer_details?.phone ?? "", total_spent: total, order_count: 1, tags: ["customer"] });
+      if (ciErr) console.error("Customer insert failed", ciErr.message);
     }
 
     // Receipt email (Resend if RESEND_API_KEY is set, otherwise Brevo)
     if (email) {
       const { subject, html } = orderConfirmedEmail({ orderId, name, items, total, address, shopUrl: SITE_URL, logoUrl: LOGO_URL });
-      await sendEmail({ to: email, name, subject, html, kind: "transactional", tags: ["order"] }).catch(console.error);
+      await sendEmail({ to: email, name, subject, html, kind: "transactional", tags: ["order"] })
+        .then(() => console.log("Order email sent to", email))
+        .catch((e) => console.error("Order email failed", e));
     }
+   } catch (e) {
+    console.error("Webhook processing failed:", e);
+    return new Response("error: " + (e as Error).message, { status: 500 }); // Stripe will retry
+   }
   }
 
   return new Response("ok");
