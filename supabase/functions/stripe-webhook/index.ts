@@ -36,8 +36,10 @@ Deno.serve(async (req) => {
     }
 
     const email = (s.customer_details?.email ?? "").toLowerCase();
-    const name = s.customer_details?.name ?? "";
-    const addr = s.shipping_details?.address ?? s.customer_details?.address;
+    // Newer Stripe API versions keep the delivery details under collected_information
+    const ship = (s as any).collected_information?.shipping_details ?? (s as any).shipping_details;
+    const name = ship?.name || s.customer_details?.name || "";
+    const addr = ship?.address ?? s.customer_details?.address;
     const address = addr ? [addr.line1, addr.line2, addr.city, addr.postal_code].filter(Boolean).join(", ") : "";
     const total = (s.amount_total ?? 0) / 100;
     const orderId = "ORD-" + s.id.slice(-8).toUpperCase();
