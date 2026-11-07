@@ -63,19 +63,19 @@ if ($whsec)  { $secrets += "STRIPE_WEBHOOK_SECRET=$whsec" }
 if ($listId) { $secrets += "BREVO_LIST_ID=$listId" }
 
 # Only create the unsubscribe secret the first time (changing it would break old unsubscribe links)
-$existing = (npx --yes supabase@latest secrets list --project-ref $ProjectRef 2>$null) -join "`n"
+$existing = (npx --yes supabase@latest secrets list --remote=$ProjectRef 2>$null) -join "`n"
 if ($existing -notmatch "UNSUBSCRIBE_SECRET") { $secrets += "UNSUBSCRIBE_SECRET=$unsub" }
 
 Write-Host ""
 Write-Host "Step 3: saving settings to Supabase..." -ForegroundColor Cyan
-npx --yes supabase@latest secrets set --project-ref $ProjectRef @secrets
+npx --yes supabase@latest secrets set --remote=$ProjectRef --yes @secrets
 
 Write-Host ""
 Write-Host "Step 4: uploading the functions..." -ForegroundColor Cyan
 $functions = @("subscribe", "create-checkout", "stripe-webhook", "order-update", "send-email", "unsubscribe")
 foreach ($f in $functions) {
   Write-Host "  - $f"
-  npx --yes supabase@latest functions deploy $f --project-ref $ProjectRef --no-verify-jwt --use-api
+  npx --yes supabase@latest functions deploy $f --remote=$ProjectRef --no-verify-jwt --use-api --yes
 }
 
 Write-Host ""
