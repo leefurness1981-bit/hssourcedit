@@ -68,7 +68,7 @@ supabase secrets set \
   EMAIL_FROM_ORDERS=orders@hssourcedit.com \
   EMAIL_FROM_MARKETING=news@hssourcedit.com \
   REPLY_TO=hello@hssourcedit.com \
-  WELCOME_CODE=WELCOME10 WELCOME_PERCENT=10 \
+  WELCOME_CODE=WELCOME5 WELCOME_PERCENT=5 \
   UNSUBSCRIBE_SECRET=$(openssl rand -hex 32) \
   SITE_URL=https://hssourcedit.com/ \
   SITE_ORIGIN=https://hssourcedit.com \
@@ -90,7 +90,7 @@ done
    - Event: `checkout.session.completed`
    - Copy the *Signing secret* (`whsec_…`) and set it as `STRIPE_WEBHOOK_SECRET`.
 3. Test with card `4242 4242 4242 4242`, any future date and any CVC. Check Admin → Orders and the stock levels.
-4. **Welcome discount (important):** Stripe → Product catalogue → Coupons → **New**: 10% off, duration *Once*. Then add a **Promotion code** `WELCOME10` and tick **"Eligible for first-time orders only"** and **"Limit to one redemption per customer"**. The welcome email promises this code, so it must exist. If you change it, update `WELCOME_CODE` (server) and `welcomeCode` in `js/config.js`.
+4. **Welcome discount (important):** Stripe → Product catalogue → Coupons → **New**: 5% off, duration *Once*. Then add a **Promotion code** `WELCOME5` and tick **"Eligible for first-time orders only"** and **"Limit to one redemption per customer"**. The welcome email promises this code, so it must exist. If you change it, update `WELCOME_CODE` (server) and `welcomeCode` in `js/config.js`.
    Other discount codes work the same way. Checkout already has a "promo code" box.
 5. When you're happy, switch to live keys.
 

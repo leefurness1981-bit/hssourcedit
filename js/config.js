@@ -13,8 +13,8 @@ window.SHOP_CONFIG = {
   shippingCost: 4.95,
   freeShippingOver: 75,
   lowStockThreshold: 3,
-  welcomeCode: "WELCOME10",   // must match the promotion code you create in Stripe (and WELCOME_CODE on the server)
-  welcomePercent: 10,
+  welcomeCode: "WELCOME5",   // must match the promotion code you create in Stripe (and WELCOME_CODE on the server)
+  welcomePercent: 5,
   contactEmail: "hello@hssourcedit.com",
   instagram: "https://instagram.com/",
   tiktok: "https://tiktok.com/",
