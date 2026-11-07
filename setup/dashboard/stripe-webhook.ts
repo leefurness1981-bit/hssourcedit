@@ -151,8 +151,10 @@ const C = {
 };
 
 function button(href, label) {
-  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0"><tr><td style="background:#ffffff;border-radius:3px">
-    <a href="${esc(href)}" style="display:inline-block;padding:15px 26px;font-family:${C.font};font-size:14px;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;color:#000000;text-decoration:none">${esc(label)}</a>
+  // Outlined button: a white border + white text survives email apps (e.g. Gmail dark mode)
+  // that recolour or strip solid button backgrounds.
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0"><tr><td style="border:2px solid #ffffff;border-radius:3px">
+    <a href="${esc(href)}" style="display:inline-block;padding:14px 26px;font-family:${C.font};font-size:14px;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;color:#ffffff;text-decoration:none;border-radius:3px">${esc(label)}</a>
   </td></tr></table>`;
 }
 
@@ -254,7 +256,7 @@ function campaignEmail({ inner, shopUrl, logoUrl, preheader = "" }) {
     .replaceAll("SHOP_URL", shopUrl)
     .replace(/<h1>/g, `<h1 style="margin:0 0 14px;font-family:${C.font};font-size:30px;line-height:1.1;font-weight:900;text-transform:uppercase;color:${C.text}">`)
     .replace(/<p>/g, `<p style="margin:0 0 14px;font-family:${C.font};font-size:15px;line-height:1.6;color:#d6d6d6">`)
-    .replace(/<a ([^>]*)class="btn"([^>]*)>/g, `<a $1$2 style="display:inline-block;margin:10px 0;padding:15px 26px;background:#ffffff;color:#000000;font-family:${C.font};font-size:14px;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;text-decoration:none;border-radius:3px">`);
+    .replace(/<a ([^>]*)class="btn"([^>]*)>/g, `<a $1$2 style="display:inline-block;margin:10px 0;padding:14px 26px;border:2px solid #ffffff;color:#ffffff;font-family:${C.font};font-size:14px;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;text-decoration:none;border-radius:3px">`);
   return layout({ body, shopUrl, logoUrl, preheader,
     footer: `You're receiving this because you signed up at HS Sourced It. {{unsubscribe}}` });
 }
