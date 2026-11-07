@@ -20,8 +20,8 @@ window.SHOP_CONFIG = {
   tiktok: "https://tiktok.com/",
 
   // ---- Live mode (see README.md) ----
-  supabaseUrl: "",      // e.g. "https://abcdxyz.supabase.co"
-  supabaseAnonKey: "",  // the "anon public" key from Supabase > Project Settings > API
+  supabaseUrl: "https://ndefypnaczwiryiiqopm.supabase.co",
+  supabaseAnonKey: "sb_publishable_Tkhmvl6eUKBYn8K18eO7RA_fA5I8Pra", // publishable key — safe to be public
 
   // The two big banner photos under the shop — swap for your own (put files in /images)
   lookbookImages: [
