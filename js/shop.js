@@ -40,7 +40,7 @@
     if (!list.length) { $("#grid").innerHTML = `<p class="empty">Nothing here yet — check back for the next drop.</p>`; return; }
     $("#grid").innerHTML = list.map((p, i) => {
       const stock = totalStock(p);
-      const badge = stock === 0 ? (canPreorder(p) ? `<span class="badge out">Pre-order</span>` : `<span class="badge out">Sold out</span>`)
+      const badge = stock === 0 ? (canPreorder(p) ? `<span class="badge out">Order now</span>` : `<span class="badge out">Sold out</span>`)
         : p.badge ? `<span class="badge ${p.badge.toLowerCase() === "sale" ? "sale" : ""}">${esc(p.badge)}</span>` : "";
       const low = stock > 0 && stock <= C.lowStockThreshold * 2 ? `<div class="low">Selling fast</div>` : "";
       return `<article class="card" data-id="${esc(p.id)}" style="animation-delay:${i * 40}ms" tabindex="0">
@@ -74,7 +74,7 @@
       const n = stockOf(p, selected);
       $("#stockNote").textContent = n <= 0 ? `Out of stock — order now and it ships in ${leadTime(p)}`
         : n <= C.lowStockThreshold ? `Only ${n} left in ${selected}` : "In stock";
-      $("#addBtn").disabled = false; $("#addBtn").textContent = (n <= 0 ? "Pre-order — " : "Add to bag — ") + money(p.price);
+      $("#addBtn").disabled = false; $("#addBtn").textContent = "Add to bag — " + money(p.price);
     });
     $("#addBtn").onclick = () => { addToCart(p, selected); close("#productOverlay"); };
     open("#productOverlay");
@@ -111,7 +111,7 @@
       b.classList.add("sel"); selected = b.dataset.size;
       const n = stockOf(p, selected);
       $("#stockNote").textContent = n <= 0 ? `Out of stock — order now and it ships in ${leadTime(p)}` : "In stock";
-      $("#addBtn").disabled = false; $("#addBtn").textContent = (n <= 0 ? "Pre-order now — " : "Buy now — ") + money(o.price);
+      $("#addBtn").disabled = false; $("#addBtn").textContent = "Buy now — " + money(o.price);
     });
     $("#addBtn").onclick = async () => {
       const qty = o.max_qty > 1 ? parseInt($("#offerQty").value, 10) : 1;
@@ -141,7 +141,7 @@
     else cart.push({ id: p.id, size, qty: 1, name: p.name, price: p.price, image: p.image });
     saveCart();
     const b = $("#cartBtn"); b.classList.remove("bump"); void b.offsetWidth; b.classList.add("bump");
-    toast(stockOf(p, size) <= 0 ? `${p.name} (${size}) pre-ordered — ships in ${leadTime(p)}` : `${p.name} (${size}) added to bag`);
+    toast(stockOf(p, size) <= 0 ? `${p.name} (${size}) added to bag — ships in ${leadTime(p)}` : `${p.name} (${size}) added to bag`);
   }
   function totals() {
     const sub = cart.reduce((a, l) => a + l.price * l.qty, 0);
@@ -153,7 +153,7 @@
     const p = products.find(x => x.id === l.id); if (!p) return "";
     const have = stockOf(p, l.size);
     if (l.qty <= have) return "";
-    const msg = have === 0 ? `Pre-order — ships in ${leadTime(p)}` : `${have} in stock, ${l.qty - have} ships in ${leadTime(p)}`;
+    const msg = have === 0 ? `Ships in ${leadTime(p)}` : `${have} in stock, ${l.qty - have} ships in ${leadTime(p)}`;
     return `<div class="pre-note">⏳ ${esc(msg)}</div>`;
   }
   function renderCart() {

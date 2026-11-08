@@ -83,7 +83,7 @@ Deno.serve(async (req) => {
           product_data: {
             name: `${p.name} — ${raw.size}${offer ? " (friends & family price)" : ""}`,
             images: imageUrl(p.image) ? [imageUrl(p.image)] : [],
-            ...(preorder ? { description: inStock > 0 ? `${inStock} in stock, ${qty - inStock} on pre-order: ships in ${lead}` : `Pre-order: ships in ${lead}` } : {}),
+            ...(preorder ? { description: inStock > 0 ? `${inStock} in stock, ${qty - inStock} ships in ${lead}` : `Ships in ${lead}` } : {}),
           },
         },
       });

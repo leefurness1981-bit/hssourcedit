@@ -31,7 +31,7 @@ function p(text, extra = "") {
 
 function itemsTable(items, total) {
   const rows = (items || []).map((i) => `<tr>
-      <td style="padding:10px 0;border-bottom:1px solid ${C.line};font-family:${C.font};font-size:14px;color:${C.text}">${esc(i.qty)}× ${esc(i.name)}<br><span style="color:${C.muted};font-size:12px">Size ${esc(i.size)}</span>${i.backorder ? `<br><span style="color:${C.text};font-size:12px;font-weight:bold">Pre-order — ships in ${esc(i.lead_time || "5–8 business days")}</span>` : ""}</td>
+      <td style="padding:10px 0;border-bottom:1px solid ${C.line};font-family:${C.font};font-size:14px;color:${C.text}">${esc(i.qty)}× ${esc(i.name)}<br><span style="color:${C.muted};font-size:12px">Size ${esc(i.size)}</span>${i.backorder ? `<br><span style="color:${C.text};font-size:12px;font-weight:bold">Ships in ${esc(i.lead_time || "5–8 business days")}</span>` : ""}</td>
       <td align="right" style="padding:10px 0;border-bottom:1px solid ${C.line};font-family:${C.font};font-size:14px;color:${C.text};white-space:nowrap">${money(i.price * i.qty)}</td></tr>`).join("");
   const tot = total != null ? `<tr><td style="padding:12px 0 0;font-family:${C.font};font-size:15px;font-weight:bold;color:${C.text}">Total paid</td>
       <td align="right" style="padding:12px 0 0;font-family:${C.font};font-size:15px;font-weight:bold;color:${C.text}">${money(total)}</td></tr>` : "";
@@ -81,7 +81,7 @@ export function orderConfirmedEmail({ orderId, name, items, total, address, shop
     ${p(`Order <strong style="color:#fff">${esc(orderId)}</strong>`, `margin-bottom:4px`)}
     ${itemsTable(items, total)}
     ${address ? p(`<strong style="color:#fff">Delivering to</strong><br>${esc(address)}`) : ""}
-    ${(items || []).some((i) => i.backorder) ? p("Items marked <strong style=\"color:#fff\">pre-order</strong> are being sourced for you and will ship within the time shown. If your order has in-stock items too, we'll send everything together.") : ""}
+    ${(items || []).some((i) => i.backorder) ? p("Some items in your order are being sourced for you and will ship within the time shown. If your order has in-stock items too, we'll send everything together.") : ""}
     ${p("We'll email you again with tracking as soon as it's on its way.")}
     ${p("Any problems? Just reply to this email.", `color:${C.muted};font-size:13px`)}`;
   return { subject: `Order ${orderId} confirmed 🔥`, html: layout({ body, shopUrl, logoUrl, preheader: "We've got your order." }) };
