@@ -22,7 +22,7 @@
   $("#igLink").href = C.instagram;
   $("#ttLink").href = C.tiktok;
   $("#year").textContent = new Date().getFullYear();
-  const tick = ["Free UK delivery over " + money(C.freeShippingOver), "New drops every Friday", `Join the list for ${C.welcomePercent}% off`];
+  const tick = ["Free UK delivery over " + money(C.freeShippingOver), `Join the list for ${C.welcomePercent}% off`];
   $("#ticker").innerHTML = [...tick, ...tick, ...tick, ...tick].map(t => `<span>${esc(t)} ✦</span>`).join("");
 
   // ---------- toast ----------
