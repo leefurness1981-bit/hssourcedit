@@ -212,3 +212,10 @@ select { background: var(--panel); border: 1px solid var(--line); padding: .5rem
 .offer-banner .link { text-decoration: underline; font-weight: 800; color: #000; margin-left: .4rem; }
 .pm-price .was { color: var(--muted); text-decoration: line-through; font-size: 1rem; font-weight: 500; margin-left: .4rem; }
 #offerQty { margin-left: .4rem; }
+
+/* Product popup photo: fixed 4:5 frame, whole photo visible (never stretched or zoomed),
+   whatever the photo's shape or the length of the text beside it */
+.pm { align-items: start; }
+.pm-img { align-self: start; aspect-ratio: 4 / 5; background: #0d0d0d; overflow: hidden; }
+.pm-img img { width: 100%; height: 100%; aspect-ratio: auto; object-fit: contain; display: block; }
+@media (min-width: 861px) { .pm-img { position: sticky; top: 0; } }
