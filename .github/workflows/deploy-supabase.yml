@@ -1,0 +1,83 @@
+# Automatically deploys the shop's backend to Supabase whenever
+# anything in the supabase/ folder changes on the main branch.
+#
+#   1. Database changes: runs any new .sql files in supabase/migrations
+#      (each file runs once; finished ones are recorded in a table).
+#   2. Functions: uploads every function in supabase/functions.
+#
+# Runs on GitHub's servers, so no computer or local network is involved.
+#
+# Needs two repository secrets (Settings › Secrets and variables › Actions):
+#   SUPABASE_ACCESS_TOKEN  – a Supabase access token (sbp_…)
+#   SUPABASE_DB_URL        – the Session pooler connection string, with the
+#                            real database password in place of [YOUR-PASSWORD]
+
+name: Deploy Supabase
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/**"
+      - ".github/workflows/deploy-supabase.yml"
+  workflow_dispatch: # adds a "Run workflow" button on the Actions tab
+
+concurrency:
+  group: deploy-supabase
+  cancel-in-progress: false
+
+env:
+  PROJECT_REF: ndefypnaczwiryiiqopm
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check secrets are set
+        env:
+          TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          missing=0
+          [ -z "$TOKEN" ]  && echo "::error::Secret SUPABASE_ACCESS_TOKEN is missing" && missing=1
+          [ -z "$DB_URL" ] && echo "::error::Secret SUPABASE_DB_URL is missing" && missing=1
+          exit $missing
+
+      - name: Database changes (supabase/migrations)
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -q -c \
+            "create table if not exists public._migrations (name text primary key, applied_at timestamptz not null default now()); alter table public._migrations enable row level security;"
+          shopt -s nullglob
+          files=(supabase/migrations/*.sql)
+          if [ ${#files[@]} -eq 0 ]; then echo "No migration files."; exit 0; fi
+          for f in "${files[@]}"; do
+            name=$(basename "$f")
+            done_already=$(psql "$DB_URL" -tA -c "select 1 from public._migrations where name = '$name'")
+            if [ "$done_already" = "1" ]; then echo "✓ $name (already applied)"; continue; fi
+            echo "→ Applying $name"
+            psql "$DB_URL" -v ON_ERROR_STOP=1 --single-transaction -q \
+              -f "$f" \
+              -c "insert into public._migrations (name) values ('$name')"
+            echo "✓ $name applied"
+          done
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy functions (supabase/functions)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          for dir in supabase/functions/*/; do
+            fn=$(basename "$dir")
+            [ "$fn" = "_shared" ] && continue
+            [ -f "$dir/index.ts" ] || continue
+            echo "→ Deploying $fn"
+            supabase functions deploy "$fn" --project-ref "$PROJECT_REF" --no-verify-jwt --use-api --yes
+          done
