@@ -1,6 +1,6 @@
 (function () {
   const C = window.SHOP_CONFIG;
-  const { money, esc, imgTag, totalStock } = window.KERB;
+  const { sizeEntries, money, esc, imgTag, totalStock } = window.KERB;
   const $ = s => document.querySelector(s);
   const $$ = s => [...document.querySelectorAll(s)];
   let products = [], orders = [], customers = [], campaigns = [], offers = [];
@@ -74,7 +74,7 @@
     ].map(([l, v]) => `<div class="kpi"><div class="label">${l}</div><div class="val">${v}</div></div>`).join("");
 
     const low = [];
-    products.forEach(p => Object.entries(p.sizes || {}).forEach(([s, n]) => { if (n <= C.lowStockThreshold) low.push({ p, s, n }); }));
+    products.forEach(p => sizeEntries(p).forEach(([s, n]) => { if (n <= C.lowStockThreshold) low.push({ p, s, n }); }));
     $("#lowStock").innerHTML = low.length ? low.sort((a, b) => a.n - b.n).slice(0, 12).map(({ p, s, n }) =>
       `<div class="mini"><span>${esc(p.name)} — ${esc(s)}</span><span class="pill ${n === 0 ? "refunded" : "packed"}">${n === 0 ? "Out" : n + " left"}</span></div>`).join("")
       : `<p class="small">All sizes healthy.</p>`;
@@ -92,7 +92,7 @@
         <td>${imgTag(p.image, p.name, "thumb")}</td>
         <td><a href="#" data-edit="${esc(p.id)}"><strong>${esc(p.name)}</strong></a><div class="small">${esc(p.category)}</div></td>
         <td>${money(p.price)}</td>
-        <td><div class="stock-cells">${Object.entries(p.sizes || {}).map(([s, n]) =>
+        <td><div class="stock-cells">${sizeEntries(p).map(([s, n]) =>
           `<label class="sc ${n == 0 ? "zero" : n <= C.lowStockThreshold ? "low" : ""}"><small>${esc(s)}</small><input type="number" min="0" value="${n}" data-pid="${esc(p.id)}" data-size="${esc(s)}"></label>`).join("")}</div></td>
         <td><strong>${totalStock(p)}</strong></td>
         <td>${p.active ? '<span class="pill on">Live</span>' : '<span class="pill">Hidden</span>'}
@@ -127,7 +127,7 @@
     f.elements.active.checked = !!p.active;
     f.elements.allow_backorder.checked = p.allow_backorder !== false;
     f.elements.lead_time.value = p.lead_time || "5–8 business days";
-    $("#sizeRows").innerHTML = Object.entries(p.sizes || {}).map(([s, n]) => sizeRow(s, n)).join("");
+    $("#sizeRows").innerHTML = sizeEntries(p).map(([s, n]) => sizeRow(s, n)).join("");
     $("#deleteProduct").hidden = !p.id;
     f.elements.family_price.value = p.family_price ?? "";
     f.elements.shipping_cost.value = p.shipping_cost ?? C.shippingCost;

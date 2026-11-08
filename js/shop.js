@@ -1,6 +1,6 @@
 (function () {
   const C = window.SHOP_CONFIG;
-  const { money, esc, imgTag, totalStock, canPreorder, leadTime, stockOf, maxQty, shipCostOf, deliveryFor } = window.KERB;
+  const { sizeEntries, money, esc, imgTag, totalStock, canPreorder, leadTime, stockOf, maxQty, shipCostOf, deliveryFor } = window.KERB;
   const FREE_N = C.freeShippingMinItems;
   const $ = s => document.querySelector(s);
   const $$ = s => [...document.querySelectorAll(s)];
@@ -55,7 +55,7 @@
   function openProduct(id) {
     const p = products.find(x => x.id === id); if (!p) return;
     let selected = null;
-    const sizes = Object.entries(p.sizes || {});
+    const sizes = sizeEntries(p);
     $("#productBody").innerHTML = `<div class="pm">
       <div class="pm-img">${imgTag(p.image, p.name)}</div>
       <div class="pm-info">
@@ -90,7 +90,7 @@
   }
   function openOffer(o) {
     const p = o.product; let selected = null;
-    const sizes = Object.entries(p.sizes || {});
+    const sizes = sizeEntries(p);
     const qtyPicker = o.max_qty > 1
       ? `<label class="small">Quantity <select id="offerQty">${Array.from({ length: o.max_qty }, (_, i) => `<option>${i + 1}</option>`).join("")}</select></label>` : "";
     $("#productBody").innerHTML = `<div class="pm">

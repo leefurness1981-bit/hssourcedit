@@ -372,5 +372,20 @@
   }
 
   window.Store = Store;
-  window.KERB = { money, esc, fallbackImg, imgTag, totalStock, DEFAULT_LEAD_TIME, canPreorder, leadTime, stockOf, maxQty, shipCostOf, deliveryFor };
+  // Sizes in a sensible order (the database stores them alphabetically): XXS..XXXL, then shoe/number sizes low to high
+  const SIZE_ORDER = ["XXXS","XXS","XS","S","M","L","XL","XXL","XXXL","4XL","5XL"];
+  function sizeRank(s) {
+    const k = String(s).toUpperCase().replace(/\s+/g, "").replace(/^(2XL)$/, "XXL").replace(/^(3XL)$/, "XXXL").replace(/^(2XS)$/, "XXS")
+      .replace(/^SMALL$/, "S").replace(/^MEDIUM$/, "M").replace(/^LARGE$/, "L").replace(/^ONESIZE$/, "M");
+    const i = SIZE_ORDER.indexOf(k);
+    if (i >= 0) return [0, i];
+    const n = parseFloat(String(s).replace(/[^0-9.]/g, ""));
+    return isNaN(n) ? [2, 0] : [1, n];
+  }
+  const sortSizes = list => [...list].sort((a, b) => {
+    const ka = sizeRank(Array.isArray(a) ? a[0] : a), kb = sizeRank(Array.isArray(b) ? b[0] : b);
+    return ka[0] - kb[0] || ka[1] - kb[1] || String(a).localeCompare(String(b));
+  });
+  const sizeEntries = p => sortSizes(Object.entries(p.sizes || {}));
+  window.KERB = { sortSizes, sizeEntries, money, esc, fallbackImg, imgTag, totalStock, DEFAULT_LEAD_TIME, canPreorder, leadTime, stockOf, maxQty, shipCostOf, deliveryFor };
 })();
