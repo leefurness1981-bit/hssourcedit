@@ -219,3 +219,9 @@ select { background: var(--panel); border: 1px solid var(--line); padding: .5rem
 .pm-img { align-self: start; aspect-ratio: 4 / 5; background: #0d0d0d; overflow: hidden; }
 .pm-img img { width: 100%; height: 100%; aspect-ratio: auto; object-fit: contain; display: block; }
 @media (min-width: 861px) { .pm-img { position: sticky; top: 0; } }
+/* Stop a very large photo from forcing the popup's photo column wider than the screen */
+.pm { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
+.pm > * { min-width: 0; }
+.pm-img img { max-width: 100%; }
+@media (max-width: 860px) { .pm { grid-template-columns: minmax(0, 1fr); } }
+.pm-info, .pm-info * { overflow-wrap: anywhere; }
