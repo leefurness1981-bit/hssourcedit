@@ -54,7 +54,7 @@ $secrets = @(
   "WELCOME_CODE=WELCOME5",
   "WELCOME_PERCENT=5",
   "SHIPPING_COST=4.95",
-  "FREE_SHIPPING_OVER=75",
+  "FREE_SHIPPING_MIN_ITEMS=2",
   "CURRENCY=gbp"
 )
 if ($brevo)  { $secrets += "BREVO_API_KEY=$brevo" }

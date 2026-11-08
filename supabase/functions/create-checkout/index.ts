@@ -6,7 +6,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { apiVersion: "2024-06-20" });
 const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 const SHIPPING = Number(Deno.env.get("SHIPPING_COST") ?? "4.95");
-const FREE_OVER = Number(Deno.env.get("FREE_SHIPPING_OVER") ?? "75");
+const FREE_MIN_ITEMS = Number(Deno.env.get("FREE_SHIPPING_MIN_ITEMS") ?? "2"); // free delivery with this many items or more
 const CURRENCY = (Deno.env.get("CURRENCY") ?? "gbp").toLowerCase();
 const ALLOWED_ORIGIN = Deno.env.get("SITE_ORIGIN") ?? "*"; // e.g. https://yourname.github.io
 const SITE_URL = (Deno.env.get("SITE_URL") ?? "").replace(/\/?$/, "/");
@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
     const { data: products, error } = await pq;
     if (error) throw error;
 
-    let subtotal = 0;
+    let subtotal = 0, itemCount = 0, deliveryCost = 0;
     const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
     // b = 1 marks a line that is (partly) a pre-order
     const meta: { id: string; size: string; qty: number; b?: number }[] = [];
@@ -70,6 +70,9 @@ Deno.serve(async (req) => {
       const lead = (p.lead_time || "").trim() || "5–8 business days";
       const unit = offer ? Number(offer.price) : Number(p.price);
       subtotal += unit * qty;
+      itemCount += qty;
+      // one delivery charge per order: the highest delivery cost of the items in it
+      deliveryCost = Math.max(deliveryCost, p.shipping_cost != null ? Number(p.shipping_cost) : SHIPPING);
       meta.push({ id: p.id, size: raw.size, qty, ...(preorder ? { b: 1 } : {}) });
       line_items.push({
         quantity: qty,
@@ -85,7 +88,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const shippingFree = subtotal >= FREE_OVER;
+    const shippingFree = itemCount >= FREE_MIN_ITEMS || deliveryCost <= 0;
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items,
@@ -99,7 +102,7 @@ Deno.serve(async (req) => {
         shipping_rate_data: {
           display_name: shippingFree ? "Free UK delivery" : "UK standard delivery",
           type: "fixed_amount",
-          fixed_amount: { amount: shippingFree ? 0 : Math.round(SHIPPING * 100), currency: CURRENCY },
+          fixed_amount: { amount: shippingFree ? 0 : Math.round(deliveryCost * 100), currency: CURRENCY },
           delivery_estimate: { minimum: { unit: "business_day", value: 2 }, maximum: { unit: "business_day", value: 4 } },
         },
       }],

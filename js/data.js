@@ -80,7 +80,7 @@
       image: U + "photo-1521572163474-6864f9cf17ab?w=900&q=80",
       description: "Heavy cotton tee with dropped shoulders. Buy two.",
       sizes: { "XS": 6, "S": 12, "M": 15, "L": 15, "XL": 8, "XXL": 4 } }
-  ].map(p => ({ ...p, active: true, allow_backorder: true, lead_time: "5–8 business days" }));
+  ].map(p => ({ ...p, active: true, allow_backorder: true, lead_time: "5–8 business days", shipping_cost: 4.95 }));
 
   // ---------- helpers ----------
   const ls = {
@@ -265,7 +265,7 @@
         const pre = line.qty > have;
         items.push({ id: p.id, name: p.name, size: line.size, qty: line.qty, price: p.price, ...(pre ? { backorder: true, lead_time: (p.lead_time || "5–8 business days") } : {}) });
       }
-      if (total < C.freeShippingOver) total += C.shippingCost;
+      total += deliveryFor(cart, products);
       ls.set("products", products);
       const orders = ls.get("orders", []);
       const order = { id: "ORD-" + uid().toUpperCase().slice(-6), customer_email: email || "guest@example.com", customer_name: "",
@@ -363,7 +363,14 @@
   const leadTime = p => (p.lead_time || "").trim() || DEFAULT_LEAD_TIME;
   const stockOf = (p, size) => Math.max(0, Number((p.sizes || {})[size] || 0));
   const maxQty = (p, size) => (canPreorder(p) ? 10 : stockOf(p, size));
+  // Delivery: free with N+ items, otherwise one delivery charge = the highest delivery cost of the items in the bag
+  const shipCostOf = p => (p && p.shipping_cost != null && p.shipping_cost !== "" ? Number(p.shipping_cost) : C.shippingCost);
+  function deliveryFor(lines, products) {
+    const count = lines.reduce((a, l) => a + Number(l.qty || 0), 0);
+    if (count === 0 || count >= C.freeShippingMinItems) return 0;
+    return Math.max(0, ...lines.map(l => shipCostOf(products.find(p => p.id === l.id))));
+  }
 
   window.Store = Store;
-  window.KERB = { money, esc, fallbackImg, imgTag, totalStock, DEFAULT_LEAD_TIME, canPreorder, leadTime, stockOf, maxQty };
+  window.KERB = { money, esc, fallbackImg, imgTag, totalStock, DEFAULT_LEAD_TIME, canPreorder, leadTime, stockOf, maxQty, shipCostOf, deliveryFor };
 })();

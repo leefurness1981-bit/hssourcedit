@@ -26,6 +26,7 @@ create table if not exists products (
   active boolean not null default true,
   allow_backorder boolean not null default true,      -- pre-orders allowed when a size is out of stock
   lead_time text not null default '5–8 business days', -- wait time shown for out-of-stock sizes
+  shipping_cost numeric(10,2) not null default 4.95 check (shipping_cost >= 0), -- delivery cost when bought on its own
   created_at timestamptz not null default now()
 );
 

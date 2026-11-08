@@ -72,7 +72,7 @@ supabase secrets set \
   UNSUBSCRIBE_SECRET=$(openssl rand -hex 32) \
   SITE_URL=https://hssourcedit.com/ \
   SITE_ORIGIN=https://hssourcedit.com \
-  SHIPPING_COST=4.95 FREE_SHIPPING_OVER=75 CURRENCY=gbp
+  SHIPPING_COST=4.95 FREE_SHIPPING_MIN_ITEMS=2 CURRENCY=gbp
 
 for f in create-checkout stripe-webhook send-email unsubscribe subscribe order-update; do
   supabase functions deploy $f --no-verify-jwt

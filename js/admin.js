@@ -96,7 +96,8 @@
           `<label class="sc ${n == 0 ? "zero" : n <= C.lowStockThreshold ? "low" : ""}"><small>${esc(s)}</small><input type="number" min="0" value="${n}" data-pid="${esc(p.id)}" data-size="${esc(s)}"></label>`).join("")}</div></td>
         <td><strong>${totalStock(p)}</strong></td>
         <td>${p.active ? '<span class="pill on">Live</span>' : '<span class="pill">Hidden</span>'}
-          <div class="small" style="margin-top:.3rem">${p.allow_backorder !== false ? "Pre-order: " + esc(p.lead_time || "5–8 business days") : "No pre-orders"}</div></td></tr>`).join("") + "</tbody>";
+          <div class="small" style="margin-top:.3rem">${p.allow_backorder !== false ? "Pre-order: " + esc(p.lead_time || "5–8 business days") : "No pre-orders"}</div>
+          <div class="small">Delivery: ${money(p.shipping_cost ?? C.shippingCost)}</div></td></tr>`).join("") + "</tbody>";
   }
   $("#stockSearch").oninput = renderStock;
   $("#stockTable").addEventListener("change", async e => {
@@ -129,6 +130,7 @@
     $("#sizeRows").innerHTML = Object.entries(p.sizes || {}).map(([s, n]) => sizeRow(s, n)).join("");
     $("#deleteProduct").hidden = !p.id;
     f.elements.family_price.value = p.family_price ?? "";
+    f.elements.shipping_cost.value = p.shipping_cost ?? C.shippingCost;
     $("#offerBox").hidden = !p.id; // offers need a saved product
     $("#ofEmail").value = ""; $("#ofName").value = ""; $("#ofMsg").textContent = "";
     $("#ofPrice").value = p.family_price ?? "";
@@ -163,7 +165,8 @@
       badge: f.elements.badge.value.trim(), image: f.elements.image.value.trim(), description: f.elements.description.value.trim(),
       active: f.elements.active.checked, sizes,
       allow_backorder: f.elements.allow_backorder.checked, lead_time: f.elements.lead_time.value.trim() || "5–8 business days",
-      family_price: f.elements.family_price.value === "" ? null : Number(f.elements.family_price.value) };
+      family_price: f.elements.family_price.value === "" ? null : Number(f.elements.family_price.value),
+      shipping_cost: f.elements.shipping_cost.value === "" ? C.shippingCost : Math.max(0, Number(f.elements.shipping_cost.value)) };
     if (!p.id) delete p.id;
     try { await Store.saveProduct(p); close("#productEditor"); toast("Product saved"); loadAll(); }
     catch (err) { toast(err.message); }

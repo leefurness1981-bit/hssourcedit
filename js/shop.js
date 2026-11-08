@@ -1,6 +1,7 @@
 (function () {
   const C = window.SHOP_CONFIG;
-  const { money, esc, imgTag, totalStock, canPreorder, leadTime, stockOf, maxQty } = window.KERB;
+  const { money, esc, imgTag, totalStock, canPreorder, leadTime, stockOf, maxQty, shipCostOf, deliveryFor } = window.KERB;
+  const FREE_N = C.freeShippingMinItems;
   const $ = s => document.querySelector(s);
   const $$ = s => [...document.querySelectorAll(s)];
 
@@ -15,7 +16,7 @@
   if (C.logo) $("#heroLogo").src = C.logo;
   $("#tagline").textContent = C.tagline;
   $("#welcomePct").textContent = C.welcomePercent;
-  $("#freeShip").textContent = `On orders over ${money(C.freeShippingOver)}`;
+  $("#freeShip").textContent = `When you order ${FREE_N} or more items`;
   $("#lookA").style.backgroundImage = `url("${C.lookbookImages[0]}")`;
   $("#lookB").style.backgroundImage = `url("${C.lookbookImages[1]}")`;
   $("#contactLink").href = C.contactUrl || "mailto:" + C.contactEmail;
@@ -23,7 +24,7 @@
   $("#igLink").href = C.instagram;
   $("#ttLink").href = C.tiktok;
   $("#year").textContent = new Date().getFullYear();
-  const tick = ["Free UK delivery over " + money(C.freeShippingOver), `Join the list for ${C.welcomePercent}% off`];
+  const tick = [`Free UK delivery on ${FREE_N}+ items`, `Join the list for ${C.welcomePercent}% off`];
   $("#ticker").innerHTML = [...tick, ...tick, ...tick, ...tick].map(t => `<span>${esc(t)} ✦</span>`).join("");
 
   // ---------- toast ----------
@@ -62,6 +63,7 @@
         <p class="eyebrow">${esc(p.category)}</p>
         <h2>${esc(p.name)}</h2>
         <div class="pm-price">${money(p.price)}</div>
+        <p class="small">Delivery ${shipCostOf(p) > 0 ? money(shipCostOf(p)) : "free"} · free when you order ${FREE_N}+ items</p>
         <p class="pm-desc">${esc(p.description)}</p>
         <div><p class="small" style="margin-bottom:.5rem">SELECT SIZE</p>
           <div class="sizes">${sizes.map(([s, n]) => `<button class="size ${n > 0 ? "" : "pre"}" data-size="${esc(s)}" ${n > 0 || canPreorder(p) ? "" : "disabled"} title="${n > 0 ? "In stock" : canPreorder(p) ? "Pre-order: ships in " + esc(leadTime(p)) : "Sold out"}">${esc(s)}</button>`).join("")}</div>
@@ -146,8 +148,9 @@
   }
   function totals() {
     const sub = cart.reduce((a, l) => a + l.price * l.qty, 0);
-    const ship = sub === 0 || sub >= C.freeShippingOver ? 0 : C.shippingCost;
-    return { sub, ship, total: sub + ship };
+    const count = cart.reduce((a, l) => a + l.qty, 0);
+    const ship = deliveryFor(cart, products);
+    return { sub, ship, total: sub + ship, count };
   }
   // Note under a bag line when some or all of it is a pre-order
   function preNote(l) {
@@ -159,7 +162,7 @@
   }
   function renderCart() {
     $("#cartCount").textContent = cart.reduce((a, l) => a + l.qty, 0);
-    const { sub, ship, total } = totals();
+    const { sub, ship, total, count } = totals();
     $("#cartItems").innerHTML = cart.length ? cart.map((l, i) => `<div class="line">
         ${imgTag(l.image, l.name)}
         <div><h4>${esc(l.name)}</h4><div class="small">Size ${esc(l.size)}</div>${preNote(l)}
@@ -170,9 +173,10 @@
     $("#subtotal").textContent = money(sub);
     $("#shipping").textContent = ship === 0 && sub > 0 ? "FREE" : money(ship);
     $("#total").textContent = money(total);
-    const pct = Math.min(100, (sub / C.freeShippingOver) * 100);
+    const pct = Math.min(100, (count / FREE_N) * 100);
     $("#shipProgress").style.width = pct + "%";
-    $("#shipMsg").textContent = sub >= C.freeShippingOver ? "You've unlocked free delivery 🔥" : `Spend ${money(C.freeShippingOver - sub)} more for free delivery`;
+    const left = FREE_N - count;
+    $("#shipMsg").textContent = count >= FREE_N ? "You've unlocked free delivery 🔥" : `Add ${left} more item${left === 1 ? "" : "s"} for free delivery`;
     $("#checkoutBtn").disabled = !cart.length;
   }
   $("#cartItems").addEventListener("click", e => {
