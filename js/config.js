@@ -17,8 +17,7 @@ window.SHOP_CONFIG = {
   welcomePercent: 5,
   contactEmail: "hello@hssourcedit.com",
   contactUrl: "https://snapchat.com/t/XMwvsQmV", // footer "Contact" link (Snapchat). Set to "" to use the email instead
-  instagram: "https://instagram.com/",
-  tiktok: "https://tiktok.com/",
+  tiktok: "https://www.tiktok.com/@hssourcedit",
 
   // ---- Live mode (see README.md) ----
   supabaseUrl: "https://ndefypnaczwiryiiqopm.supabase.co",

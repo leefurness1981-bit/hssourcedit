@@ -21,7 +21,6 @@
   $("#lookB").style.backgroundImage = `url("${C.lookbookImages[1]}")`;
   $("#contactLink").href = C.contactUrl || "mailto:" + C.contactEmail;
   if (C.contactUrl) { $("#contactLink").target = "_blank"; $("#contactLink").rel = "noopener"; }
-  $("#igLink").href = C.instagram;
   $("#ttLink").href = C.tiktok;
   $("#year").textContent = new Date().getFullYear();
   const tick = [`Free UK delivery on ${FREE_N}+ items`, `Join the list for ${C.welcomePercent}% off`];
