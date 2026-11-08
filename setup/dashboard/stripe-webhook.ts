@@ -18,6 +18,8 @@ const FROM_NAME = env("EMAIL_FROM_NAME", "HS Sourced It");
 const FROM_ORDERS = env("EMAIL_FROM_ORDERS", "orders@example.com");
 const FROM_MARKETING = env("EMAIL_FROM_MARKETING", FROM_ORDERS);
 const REPLY_TO = env("REPLY_TO", FROM_ORDERS);
+/** Where "new order" alerts go (defaults to the shop inbox). Comma-separate for several addresses. */
+const ORDER_NOTIFY_TO = env("ORDER_NOTIFY_TO", REPLY_TO).split(",").map((s) => s.trim()).filter(Boolean);
 const BREVO_KEY = env("BREVO_API_KEY");
 const RESEND_KEY = env("RESEND_API_KEY");
 
@@ -53,7 +55,7 @@ function htmlToText(html: string): string {
 }
 
 type Mail = {
-  to: string; name?: string; subject: string; html: string;
+  to: string; name?: string; subject: string; html: string; replyTo?: string;
   kind: "marketing" | "transactional"; headers?: Record<string, string>; tags?: string[];
 };
 
@@ -68,7 +70,7 @@ async function sendEmail(m: Mail): Promise<void> {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: `${FROM_NAME} <${from}>`, to: m.to, reply_to: REPLY_TO, subject: m.subject, html: m.html, text: htmlToText(m.html), headers: m.headers }),
+      body: JSON.stringify({ from: `${FROM_NAME} <${from}>`, to: m.to, reply_to: m.replyTo || REPLY_TO, subject: m.subject, html: m.html, text: htmlToText(m.html), headers: m.headers }),
     });
     if (res.status === 429) throw new SendLimitError("Resend sending limit reached");
     if (!res.ok) throw new Error(`Resend: ${await res.text()}`);
@@ -82,7 +84,7 @@ async function sendEmail(m: Mail): Promise<void> {
     body: JSON.stringify({
       sender: { name: FROM_NAME, email: from },
       to: [{ email: m.to, ...(m.name ? { name: m.name } : {}) }],
-      replyTo: { email: REPLY_TO, name: FROM_NAME },
+      replyTo: m.replyTo ? { email: m.replyTo } : { email: REPLY_TO, name: FROM_NAME },
       subject: m.subject, htmlContent: m.html, textContent: htmlToText(m.html), headers: m.headers, tags: m.tags,
     }),
   });
@@ -286,6 +288,25 @@ function offerEmail({ name, productName, imageUrl, price, normalPrice, url, expi
   };
 }
 
+
+/** Internal alert to the shop when an order is paid. */
+function newOrderAlertEmail({ orderId, name, email, phone, address, items, total, friendsFamily, adminUrl, shopUrl, logoUrl }) {
+  const toSource = (items || []).filter((i) => i.backorder);
+  const body = `
+    ${heading("New order 🔥")}
+    ${p(`<strong style="color:#fff">${esc(orderId)}</strong> · ${money(total)}${friendsFamily ? ` · <strong style="color:#fff">Friends & family</strong>` : ""}`)}
+    ${itemsTable(items, total)}
+    ${toSource.length ? p(`<strong style="color:#fff">⚠ To source:</strong> ${toSource.map((i) => `${esc(i.qty)}× ${esc(i.name)} (${esc(i.size)})`).join(", ")}`) : ""}
+    ${p(`<strong style="color:#fff">Customer</strong><br>${esc(name || "—")}<br>${esc(email || "")}${phone ? "<br>" + esc(phone) : ""}`)}
+    ${address ? p(`<strong style="color:#fff">Deliver to</strong><br>${esc(address)}`) : ""}
+    ${button(adminUrl, "Open orders in admin")}
+    ${p("Replying to this email goes straight to the customer.", `font-size:12px;color:${C.muted}`)}`;
+  return {
+    subject: `🛒 New order ${orderId} — ${money(total)}${toSource.length ? " (items to source)" : ""}`,
+    html: layout({ body, shopUrl, logoUrl, preheader: `${(items || []).length} item(s) · ${money(total)}` }),
+  };
+}
+
 // ---------- function ----------
 // Stripe → Supabase: when a payment completes, record the order,
 // reduce stock, update the customer's CRM record and email a receipt.
@@ -377,6 +398,17 @@ Deno.serve(async (req) => {
       await sendEmail({ to: email, name, subject, html, kind: "transactional", tags: ["order"] })
         .then(() => console.log("Order email sent to", email))
         .catch((e) => console.error("Order email failed", e));
+    }
+
+    // "New order" alert to the shop
+    const alert = newOrderAlertEmail({
+      orderId, name, email, phone: s.customer_details?.phone ?? "", address, items, total,
+      friendsFamily: !!offerToken, adminUrl: SITE_URL + "admin.html", shopUrl: SITE_URL, logoUrl: LOGO_URL,
+    });
+    for (const to of ORDER_NOTIFY_TO) {
+      await sendEmail({ to, subject: alert.subject, html: alert.html, kind: "transactional", tags: ["order-alert"], replyTo: email || undefined })
+        .then(() => console.log("Order alert sent to", to))
+        .catch((e) => console.error("Order alert failed", to, e));
     }
    } catch (e) {
     console.error("Webhook processing failed:", e);

@@ -1,8 +1,8 @@
 // Stripe → Supabase: when a payment completes, record the order,
 // reduce stock, update the customer's CRM record and email a receipt.
 import Stripe from "npm:stripe@16";
-import { db, sendEmail, SITE_URL, LOGO_URL } from "../_shared/email.ts";
-import { orderConfirmedEmail } from "../_shared/templates.js";
+import { db, sendEmail, SITE_URL, LOGO_URL, ORDER_NOTIFY_TO } from "../_shared/email.ts";
+import { orderConfirmedEmail, newOrderAlertEmail } from "../_shared/templates.js";
 
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { apiVersion: "2024-06-20" });
 const WEBHOOK_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET")!;
@@ -91,6 +91,17 @@ Deno.serve(async (req) => {
       await sendEmail({ to: email, name, subject, html, kind: "transactional", tags: ["order"] })
         .then(() => console.log("Order email sent to", email))
         .catch((e) => console.error("Order email failed", e));
+    }
+
+    // "New order" alert to the shop
+    const alert = newOrderAlertEmail({
+      orderId, name, email, phone: s.customer_details?.phone ?? "", address, items, total,
+      friendsFamily: !!offerToken, adminUrl: SITE_URL + "admin.html", shopUrl: SITE_URL, logoUrl: LOGO_URL,
+    });
+    for (const to of ORDER_NOTIFY_TO) {
+      await sendEmail({ to, subject: alert.subject, html: alert.html, kind: "transactional", tags: ["order-alert"], replyTo: email || undefined })
+        .then(() => console.log("Order alert sent to", to))
+        .catch((e) => console.error("Order alert failed", to, e));
     }
    } catch (e) {
     console.error("Webhook processing failed:", e);

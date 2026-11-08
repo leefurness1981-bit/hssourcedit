@@ -148,3 +148,22 @@ export function offerEmail({ name, productName, imageUrl, price, normalPrice, ur
     html: layout({ body, shopUrl, logoUrl, preheader: `${productName} for ${money(price)}, just for you.` }),
   };
 }
+
+
+/** Internal alert to the shop when an order is paid. */
+export function newOrderAlertEmail({ orderId, name, email, phone, address, items, total, friendsFamily, adminUrl, shopUrl, logoUrl }) {
+  const toSource = (items || []).filter((i) => i.backorder);
+  const body = `
+    ${heading("New order 🔥")}
+    ${p(`<strong style="color:#fff">${esc(orderId)}</strong> · ${money(total)}${friendsFamily ? ` · <strong style="color:#fff">Friends & family</strong>` : ""}`)}
+    ${itemsTable(items, total)}
+    ${toSource.length ? p(`<strong style="color:#fff">⚠ To source:</strong> ${toSource.map((i) => `${esc(i.qty)}× ${esc(i.name)} (${esc(i.size)})`).join(", ")}`) : ""}
+    ${p(`<strong style="color:#fff">Customer</strong><br>${esc(name || "—")}<br>${esc(email || "")}${phone ? "<br>" + esc(phone) : ""}`)}
+    ${address ? p(`<strong style="color:#fff">Deliver to</strong><br>${esc(address)}`) : ""}
+    ${button(adminUrl, "Open orders in admin")}
+    ${p("Replying to this email goes straight to the customer.", `font-size:12px;color:${C.muted}`)}`;
+  return {
+    subject: `🛒 New order ${orderId} — ${money(total)}${toSource.length ? " (items to source)" : ""}`,
+    html: layout({ body, shopUrl, logoUrl, preheader: `${(items || []).length} item(s) · ${money(total)}` }),
+  };
+}

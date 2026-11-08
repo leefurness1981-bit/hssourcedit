@@ -17,6 +17,8 @@ const FROM_NAME = env("EMAIL_FROM_NAME", "HS Sourced It");
 const FROM_ORDERS = env("EMAIL_FROM_ORDERS", "orders@example.com");
 const FROM_MARKETING = env("EMAIL_FROM_MARKETING", FROM_ORDERS);
 const REPLY_TO = env("REPLY_TO", FROM_ORDERS);
+/** Where "new order" alerts go (defaults to the shop inbox). Comma-separate for several addresses. */
+const ORDER_NOTIFY_TO = env("ORDER_NOTIFY_TO", REPLY_TO).split(",").map((s) => s.trim()).filter(Boolean);
 const BREVO_KEY = env("BREVO_API_KEY");
 const RESEND_KEY = env("RESEND_API_KEY");
 
@@ -52,7 +54,7 @@ function htmlToText(html: string): string {
 }
 
 type Mail = {
-  to: string; name?: string; subject: string; html: string;
+  to: string; name?: string; subject: string; html: string; replyTo?: string;
   kind: "marketing" | "transactional"; headers?: Record<string, string>; tags?: string[];
 };
 
@@ -67,7 +69,7 @@ async function sendEmail(m: Mail): Promise<void> {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${RESEND_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: `${FROM_NAME} <${from}>`, to: m.to, reply_to: REPLY_TO, subject: m.subject, html: m.html, text: htmlToText(m.html), headers: m.headers }),
+      body: JSON.stringify({ from: `${FROM_NAME} <${from}>`, to: m.to, reply_to: m.replyTo || REPLY_TO, subject: m.subject, html: m.html, text: htmlToText(m.html), headers: m.headers }),
     });
     if (res.status === 429) throw new SendLimitError("Resend sending limit reached");
     if (!res.ok) throw new Error(`Resend: ${await res.text()}`);
@@ -81,7 +83,7 @@ async function sendEmail(m: Mail): Promise<void> {
     body: JSON.stringify({
       sender: { name: FROM_NAME, email: from },
       to: [{ email: m.to, ...(m.name ? { name: m.name } : {}) }],
-      replyTo: { email: REPLY_TO, name: FROM_NAME },
+      replyTo: m.replyTo ? { email: m.replyTo } : { email: REPLY_TO, name: FROM_NAME },
       subject: m.subject, htmlContent: m.html, textContent: htmlToText(m.html), headers: m.headers, tags: m.tags,
     }),
   });

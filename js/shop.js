@@ -18,7 +18,8 @@
   $("#freeShip").textContent = `On orders over ${money(C.freeShippingOver)}`;
   $("#lookA").style.backgroundImage = `url("${C.lookbookImages[0]}")`;
   $("#lookB").style.backgroundImage = `url("${C.lookbookImages[1]}")`;
-  $("#contactLink").href = "mailto:" + C.contactEmail;
+  $("#contactLink").href = C.contactUrl || "mailto:" + C.contactEmail;
+  if (C.contactUrl) { $("#contactLink").target = "_blank"; $("#contactLink").rel = "noopener"; }
   $("#igLink").href = C.instagram;
   $("#ttLink").href = C.tiktok;
   $("#year").textContent = new Date().getFullYear();
