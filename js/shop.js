@@ -1,6 +1,6 @@
 (function () {
   const C = window.SHOP_CONFIG;
-  const { money, esc, imgTag, totalStock } = window.KERB;
+  const { money, esc, imgTag, totalStock, canPreorder, leadTime, stockOf, maxQty } = window.KERB;
   const $ = s => document.querySelector(s);
   const $$ = s => [...document.querySelectorAll(s)];
 
@@ -40,7 +40,7 @@
     if (!list.length) { $("#grid").innerHTML = `<p class="empty">Nothing here yet — check back for the next drop.</p>`; return; }
     $("#grid").innerHTML = list.map((p, i) => {
       const stock = totalStock(p);
-      const badge = stock === 0 ? `<span class="badge out">Sold out</span>`
+      const badge = stock === 0 ? (canPreorder(p) ? `<span class="badge out">Pre-order</span>` : `<span class="badge out">Sold out</span>`)
         : p.badge ? `<span class="badge ${p.badge.toLowerCase() === "sale" ? "sale" : ""}">${esc(p.badge)}</span>` : "";
       const low = stock > 0 && stock <= C.lowStockThreshold * 2 ? `<div class="low">Selling fast</div>` : "";
       return `<article class="card" data-id="${esc(p.id)}" style="animation-delay:${i * 40}ms" tabindex="0">
@@ -63,16 +63,18 @@
         <div class="pm-price">${money(p.price)}</div>
         <p class="pm-desc">${esc(p.description)}</p>
         <div><p class="small" style="margin-bottom:.5rem">SELECT SIZE</p>
-          <div class="sizes">${sizes.map(([s, n]) => `<button class="size" data-size="${esc(s)}" ${n > 0 ? "" : "disabled"}>${esc(s)}</button>`).join("")}</div></div>
+          <div class="sizes">${sizes.map(([s, n]) => `<button class="size ${n > 0 ? "" : "pre"}" data-size="${esc(s)}" ${n > 0 || canPreorder(p) ? "" : "disabled"} title="${n > 0 ? "In stock" : canPreorder(p) ? "Pre-order: ships in " + esc(leadTime(p)) : "Sold out"}">${esc(s)}</button>`).join("")}</div>
+          ${canPreorder(p) && sizes.some(([, n]) => n <= 0) ? `<p class="small pre-key">Dashed sizes are out of stock — order now, ships in ${esc(leadTime(p))}.</p>` : ""}</div>
         <div class="stock-note" id="stockNote"></div>
         <button class="btn btn-accent btn-block" id="addBtn" disabled>Select a size</button>
       </div></div>`;
     $$("#productBody .size").forEach(b => b.onclick = () => {
       $$("#productBody .size").forEach(x => x.classList.remove("sel"));
       b.classList.add("sel"); selected = b.dataset.size;
-      const n = p.sizes[selected];
-      $("#stockNote").textContent = n <= C.lowStockThreshold ? `Only ${n} left in ${selected}` : "In stock";
-      $("#addBtn").disabled = false; $("#addBtn").textContent = "Add to bag — " + money(p.price);
+      const n = stockOf(p, selected);
+      $("#stockNote").textContent = n <= 0 ? `Out of stock — order now and it ships in ${leadTime(p)}`
+        : n <= C.lowStockThreshold ? `Only ${n} left in ${selected}` : "In stock";
+      $("#addBtn").disabled = false; $("#addBtn").textContent = (n <= 0 ? "Pre-order — " : "Add to bag — ") + money(p.price);
     });
     $("#addBtn").onclick = () => { addToCart(p, selected); close("#productOverlay"); };
     open("#productOverlay");
@@ -82,24 +84,32 @@
   function saveCart() { try { localStorage.setItem("hs_cart", JSON.stringify(cart)); } catch {} renderCart(); }
   function addToCart(p, size) {
     const line = cart.find(l => l.id === p.id && l.size === size);
-    const max = p.sizes[size] || 0;
-    if (line) { if (line.qty >= max) return toast(`Only ${max} available in ${size}`); line.qty++; }
+    const max = maxQty(p, size);
+    if (line) { if (line.qty >= max) return toast(max ? `Max ${max} per order in ${size}` : `${size} is sold out`); line.qty++; }
     else cart.push({ id: p.id, size, qty: 1, name: p.name, price: p.price, image: p.image });
     saveCart();
     const b = $("#cartBtn"); b.classList.remove("bump"); void b.offsetWidth; b.classList.add("bump");
-    toast(`${p.name} (${size}) added to bag`);
+    toast(stockOf(p, size) <= 0 ? `${p.name} (${size}) pre-ordered — ships in ${leadTime(p)}` : `${p.name} (${size}) added to bag`);
   }
   function totals() {
     const sub = cart.reduce((a, l) => a + l.price * l.qty, 0);
     const ship = sub === 0 || sub >= C.freeShippingOver ? 0 : C.shippingCost;
     return { sub, ship, total: sub + ship };
   }
+  // Note under a bag line when some or all of it is a pre-order
+  function preNote(l) {
+    const p = products.find(x => x.id === l.id); if (!p) return "";
+    const have = stockOf(p, l.size);
+    if (l.qty <= have) return "";
+    const msg = have === 0 ? `Pre-order — ships in ${leadTime(p)}` : `${have} in stock, ${l.qty - have} ships in ${leadTime(p)}`;
+    return `<div class="pre-note">⏳ ${esc(msg)}</div>`;
+  }
   function renderCart() {
     $("#cartCount").textContent = cart.reduce((a, l) => a + l.qty, 0);
     const { sub, ship, total } = totals();
     $("#cartItems").innerHTML = cart.length ? cart.map((l, i) => `<div class="line">
         ${imgTag(l.image, l.name)}
-        <div><h4>${esc(l.name)}</h4><div class="small">Size ${esc(l.size)}</div>
+        <div><h4>${esc(l.name)}</h4><div class="small">Size ${esc(l.size)}</div>${preNote(l)}
           <div class="qty"><button data-dec="${i}" aria-label="Decrease">−</button><span>${l.qty}</span><button data-inc="${i}" aria-label="Increase">+</button></div>
           <button class="remove" data-rm="${i}">Remove</button></div>
         <strong>${money(l.price * l.qty)}</strong></div>`).join("")
@@ -116,7 +126,7 @@
     const t = e.target;
     if (t.dataset.inc !== undefined) {
       const l = cart[t.dataset.inc]; const p = products.find(x => x.id === l.id);
-      if (p && l.qty >= (p.sizes[l.size] || 0)) return toast("That's all we've got in that size");
+      if (p && l.qty >= maxQty(p, l.size)) return toast(canPreorder(p) ? "That's the most you can order at once" : "That's all we've got in that size");
       l.qty++; saveCart();
     }
     if (t.dataset.dec !== undefined) { const l = cart[t.dataset.dec]; l.qty--; if (l.qty < 1) cart.splice(t.dataset.dec, 1); saveCart(); }

@@ -82,7 +82,7 @@
   function renderStock() {
     const term = $("#stockSearch").value.toLowerCase();
     const list = products.filter(p => (p.name + p.category).toLowerCase().includes(term));
-    $("#stockTable").innerHTML = `<thead><tr><th></th><th>Product</th><th>Price</th><th>Stock by size (edit inline)</th><th>Total</th><th>Status</th></tr></thead><tbody>` +
+    $("#stockTable").innerHTML = `<thead><tr><th></th><th>Product</th><th>Price</th><th>Stock by size (edit inline)</th><th>Total</th><th>Status / when out of stock</th></tr></thead><tbody>` +
       list.map(p => `<tr>
         <td>${imgTag(p.image, p.name, "thumb")}</td>
         <td><a href="#" data-edit="${esc(p.id)}"><strong>${esc(p.name)}</strong></a><div class="small">${esc(p.category)}</div></td>
@@ -90,7 +90,8 @@
         <td><div class="stock-cells">${Object.entries(p.sizes || {}).map(([s, n]) =>
           `<label class="sc ${n == 0 ? "zero" : n <= C.lowStockThreshold ? "low" : ""}"><small>${esc(s)}</small><input type="number" min="0" value="${n}" data-pid="${esc(p.id)}" data-size="${esc(s)}"></label>`).join("")}</div></td>
         <td><strong>${totalStock(p)}</strong></td>
-        <td>${p.active ? '<span class="pill on">Live</span>' : '<span class="pill">Hidden</span>'}</td></tr>`).join("") + "</tbody>";
+        <td>${p.active ? '<span class="pill on">Live</span>' : '<span class="pill">Hidden</span>'}
+          <div class="small" style="margin-top:.3rem">${p.allow_backorder !== false ? "Pre-order: " + esc(p.lead_time || "5–8 business days") : "No pre-orders"}</div></td></tr>`).join("") + "</tbody>";
   }
   $("#stockSearch").oninput = renderStock;
   $("#stockTable").addEventListener("change", async e => {
@@ -118,6 +119,8 @@
     $("#peTitle").textContent = p.id ? "Edit product" : "New product";
     ["name", "category", "price", "badge", "image", "description"].forEach(k => (f.elements[k].value = p[k] ?? ""));
     f.elements.active.checked = !!p.active;
+    f.elements.allow_backorder.checked = p.allow_backorder !== false;
+    f.elements.lead_time.value = p.lead_time || "5–8 business days";
     $("#sizeRows").innerHTML = Object.entries(p.sizes || {}).map(([s, n]) => sizeRow(s, n)).join("");
     $("#deleteProduct").hidden = !p.id;
     previewImg();
@@ -148,7 +151,8 @@
     const p = { ...(products.find(x => x.id === f.dataset.id) || {}), id: f.dataset.id || undefined,
       name: f.elements.name.value.trim(), category: f.elements.category.value, price: Number(f.elements.price.value),
       badge: f.elements.badge.value.trim(), image: f.elements.image.value.trim(), description: f.elements.description.value.trim(),
-      active: f.elements.active.checked, sizes };
+      active: f.elements.active.checked, sizes,
+      allow_backorder: f.elements.allow_backorder.checked, lead_time: f.elements.lead_time.value.trim() || "5–8 business days" };
     if (!p.id) delete p.id;
     try { await Store.saveProduct(p); close("#productEditor"); toast("Product saved"); loadAll(); }
     catch (err) { toast(err.message); }
@@ -174,7 +178,7 @@
       (list.length ? list.map(o => `<tr>
         <td><strong>${esc(o.id)}</strong></td><td>${fmtDate(o.created_at)}</td>
         <td>${esc(o.customer_name || "")}<div class="small">${esc(o.customer_email)}</div>${o.shipping_address ? `<div class="small">${esc(o.shipping_address)}</div>` : ""}</td>
-        <td>${(o.items || []).map(i => `${i.qty}× ${esc(i.name)} <span class="small">(${esc(i.size)})</span>`).join("<br>")}</td>
+        <td>${(o.items || []).map(i => `${i.qty}× ${esc(i.name)} <span class="small">(${esc(i.size)})</span>${i.backorder ? ` <span class="pill packed">pre-order · ${esc(i.lead_time || "")}</span>` : ""}`).join("<br>")}</td>
         <td>${money(o.total)}</td>
         <td><select data-oid="${esc(o.id)}">${STATUSES.map(s => `<option ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}</select></td>
         <td>${trackCell(o)}</td></tr>`).join("")

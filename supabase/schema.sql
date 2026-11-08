@@ -24,6 +24,8 @@ create table if not exists products (
   description text default '',
   sizes jsonb not null default '{}'::jsonb,
   active boolean not null default true,
+  allow_backorder boolean not null default true,      -- pre-orders allowed when a size is out of stock
+  lead_time text not null default '5–8 business days', -- wait time shown for out-of-stock sizes
   created_at timestamptz not null default now()
 );
 

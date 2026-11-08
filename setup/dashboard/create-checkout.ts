@@ -34,22 +34,30 @@ Deno.serve(async (req) => {
 
     let subtotal = 0;
     const line_items: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
-    const meta: { id: string; size: string; qty: number }[] = [];
+    // b = 1 marks a line that is (partly) a pre-order
+    const meta: { id: string; size: string; qty: number; b?: number }[] = [];
 
     for (const raw of items) {
       const qty = Math.max(1, Math.min(10, parseInt(raw.qty, 10) || 1));
       const p = products!.find((x) => x.id === raw.id);
       if (!p) return json({ error: "A product in your bag is no longer available" }, 400);
-      const inStock = Number(p.sizes?.[raw.size] ?? 0);
-      if (inStock < qty) return json({ error: `Sorry — ${p.name} (${raw.size}) only has ${inStock} left` }, 409);
+      if (!p.sizes || !(raw.size in p.sizes)) return json({ error: `Sorry — ${p.name} doesn't come in ${raw.size}` }, 400);
+      const inStock = Math.max(0, Number(p.sizes[raw.size] ?? 0));
+      const preorder = qty > inStock;
+      if (preorder && p.allow_backorder === false) return json({ error: `Sorry — ${p.name} (${raw.size}) only has ${inStock} left` }, 409);
+      const lead = (p.lead_time || "").trim() || "5–8 business days";
       subtotal += Number(p.price) * qty;
-      meta.push({ id: p.id, size: raw.size, qty });
+      meta.push({ id: p.id, size: raw.size, qty, ...(preorder ? { b: 1 } : {}) });
       line_items.push({
         quantity: qty,
         price_data: {
           currency: CURRENCY,
           unit_amount: Math.round(Number(p.price) * 100),
-          product_data: { name: `${p.name} — ${raw.size}`, images: p.image?.startsWith("http") ? [p.image] : [] },
+          product_data: {
+            name: `${p.name} — ${raw.size}`,
+            images: p.image?.startsWith("http") ? [p.image] : [],
+            ...(preorder ? { description: inStock > 0 ? `${inStock} in stock, ${qty - inStock} on pre-order: ships in ${lead}` : `Pre-order: ships in ${lead}` } : {}),
+          },
         },
       });
     }

@@ -80,7 +80,7 @@
       image: U + "photo-1521572163474-6864f9cf17ab?w=900&q=80",
       description: "Heavy cotton tee with dropped shoulders. Buy two.",
       sizes: { "XS": 6, "S": 12, "M": 15, "L": 15, "XL": 8, "XXL": 4 } }
-  ].map(p => ({ ...p, active: true }));
+  ].map(p => ({ ...p, active: true, allow_backorder: true, lead_time: "5–8 business days" }));
 
   // ---------- helpers ----------
   const ls = {
@@ -253,14 +253,17 @@
       const items = [];
       for (const line of cart) {
         const p = products.find(x => x.id === line.id);
-        if (!p || (p.sizes[line.size] || 0) < line.qty) throw new Error(`Sorry — ${line.name} (${line.size}) just sold out.`);
+        if (!p) throw new Error(`Sorry — ${line.name} is no longer available.`);
+        if (p.allow_backorder === false && (p.sizes[line.size] || 0) < line.qty) throw new Error(`Sorry — ${line.name} (${line.size}) just sold out.`);
       }
       let total = 0;
       for (const line of cart) {
         const p = products.find(x => x.id === line.id);
-        p.sizes[line.size] -= line.qty;
+        const have = Math.max(0, p.sizes[line.size] || 0);
+        p.sizes[line.size] = Math.max(0, have - line.qty);
         total += p.price * line.qty;
-        items.push({ id: p.id, name: p.name, size: line.size, qty: line.qty, price: p.price });
+        const pre = line.qty > have;
+        items.push({ id: p.id, name: p.name, size: line.size, qty: line.qty, price: p.price, ...(pre ? { backorder: true, lead_time: (p.lead_time || "5–8 business days") } : {}) });
       }
       if (total < C.freeShippingOver) total += C.shippingCost;
       ls.set("products", products);
@@ -337,7 +340,13 @@
     return `<img class="${cls}" src="${esc(src || fallbackImg(label))}" alt="${esc(label)}" loading="lazy" onerror="this.onerror=null;this.src=window.KERB.fallbackImg(this.alt)">`;
   }
   const totalStock = p => Object.values(p.sizes || {}).reduce((a, b) => a + Number(b || 0), 0);
+  // Pre-orders: out-of-stock sizes can still be ordered (unless switched off per product) with a wait time
+  const DEFAULT_LEAD_TIME = "5–8 business days";
+  const canPreorder = p => p.allow_backorder !== false;
+  const leadTime = p => (p.lead_time || "").trim() || DEFAULT_LEAD_TIME;
+  const stockOf = (p, size) => Math.max(0, Number((p.sizes || {})[size] || 0));
+  const maxQty = (p, size) => (canPreorder(p) ? 10 : stockOf(p, size));
 
   window.Store = Store;
-  window.KERB = { money, esc, fallbackImg, imgTag, totalStock };
+  window.KERB = { money, esc, fallbackImg, imgTag, totalStock, DEFAULT_LEAD_TIME, canPreorder, leadTime, stockOf, maxQty };
 })();

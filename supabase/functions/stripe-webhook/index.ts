@@ -29,12 +29,15 @@ Deno.serve(async (req) => {
     if (exErr) throw new Error("Reading orders failed: " + exErr.message);
     if (existing) { console.log("Already processed", existing.id); return new Response("already processed"); }
 
-    const meta: { id: string; size: string; qty: number }[] = JSON.parse(s.metadata?.items ?? "[]");
-    const { data: products, error: prErr } = await db.from("products").select("id,name,price").in("id", meta.map((m) => m.id));
+    const meta: { id: string; size: string; qty: number; b?: number }[] = JSON.parse(s.metadata?.items ?? "[]");
+    const { data: products, error: prErr } = await db.from("products").select("id,name,price,lead_time").in("id", meta.map((m) => m.id));
     if (prErr) throw new Error("Reading products failed: " + prErr.message);
     const items = meta.map((m) => {
       const p = products?.find((x) => x.id === m.id);
-      return { id: m.id, name: p?.name ?? m.id, size: m.size, qty: m.qty, price: Number(p?.price ?? 0) };
+      return {
+        id: m.id, name: p?.name ?? m.id, size: m.size, qty: m.qty, price: Number(p?.price ?? 0),
+        ...(m.b ? { backorder: true, lead_time: (p?.lead_time || "").trim() || "5–8 business days" } : {}),
+      };
     });
 
     for (const m of meta) {
