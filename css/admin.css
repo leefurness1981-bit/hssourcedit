@@ -97,3 +97,7 @@ label.check input { width: auto; }
 #preview { height: 560px; background: #000; }
 .ship-modal { width: min(560px, 94vw); }
 button.link { text-decoration: underline; color: var(--muted); }
+
+.offer-box { border-top: 1px solid var(--line); padding-top: 1.2rem; margin-top: .4rem; display: flex; flex-direction: column; gap: .8rem; }
+.offer-box .row-btns { justify-content: flex-start; }
+.copy-link { font-size: .75rem; text-decoration: underline; color: var(--muted); margin-left: .4rem; }

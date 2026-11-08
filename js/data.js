@@ -238,12 +238,12 @@
 
     // Checkout
     // cart: [{id, size, qty}]
-    async checkout(cart, email) {
+    async checkout(cart, email, offer) {
       if (LIVE) {
         const { url } = await fn("create-checkout", {
-          items: cart.map(({ id, size, qty }) => ({ id, size, qty })), email,
+          items: cart.map(({ id, size, qty }) => ({ id, size, qty })), email, offer,
           success_url: location.origin + location.pathname + "?checkout=success&session_id={CHECKOUT_SESSION_ID}",
-          cancel_url: location.origin + location.pathname + "?checkout=cancelled"
+          cancel_url: location.origin + location.pathname + (offer ? "?offer=" + encodeURIComponent(offer) : "?checkout=cancelled")
         });
         location.href = url;
         return;
@@ -277,6 +277,23 @@
       c.total_spent = Math.round((c.total_spent + order.total) * 100) / 100; c.order_count += 1;
       ls.set("customers", customers);
       return { demo: true, order };
+    },
+
+    // Friends & family offers (live mode only)
+    async getOffer(token) {
+      if (!LIVE) return { valid: false, reason: "Offers work once the shop is live." };
+      return fn("offer-info", { token });
+    },
+    async sendOffer(o) {
+      if (!LIVE) throw new Error("Offers work once the shop is connected to Supabase (live mode).");
+      return fn("send-offer", o);
+    },
+    async getOffers() {
+      if (!LIVE) return [];
+      return q(client().from("offers").select("*, products(name)").order("created_at", { ascending: false }));
+    },
+    async cancelOffer(token) {
+      return q(client().from("offers").update({ status: "cancelled" }).eq("token", token).neq("status", "used"));
     },
 
     // Email campaigns

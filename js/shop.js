@@ -80,6 +80,58 @@
     open("#productOverlay");
   }
 
+  // ---------- friends & family offer (one-time link: ?offer=TOKEN) ----------
+  let activeOffer = null;
+  function offerBanner(html) {
+    document.querySelector(".offer-banner")?.remove();
+    $("#hero").insertAdjacentHTML("beforebegin", `<div class="offer-banner">${html}</div>`);
+  }
+  function openOffer(o) {
+    const p = o.product; let selected = null;
+    const sizes = Object.entries(p.sizes || {});
+    const qtyPicker = o.max_qty > 1
+      ? `<label class="small">Quantity <select id="offerQty">${Array.from({ length: o.max_qty }, (_, i) => `<option>${i + 1}</option>`).join("")}</select></label>` : "";
+    $("#productBody").innerHTML = `<div class="pm">
+      <div class="pm-img">${imgTag(p.image, p.name)}</div>
+      <div class="pm-info">
+        <p class="eyebrow">Friends & family price${o.name ? " for " + esc(o.name) : ""}</p>
+        <h2>${esc(p.name)}</h2>
+        <div class="pm-price">${money(o.price)} ${Number(p.price) > o.price ? `<span class="was">${money(p.price)}</span>` : ""}</div>
+        <p class="pm-desc">${esc(p.description || "")}</p>
+        <div><p class="small" style="margin-bottom:.5rem">SELECT SIZE</p>
+          <div class="sizes">${sizes.map(([s, n]) => `<button class="size ${n > 0 ? "" : "pre"}" data-size="${esc(s)}" ${n > 0 || canPreorder(p) ? "" : "disabled"}>${esc(s)}</button>`).join("")}</div>
+          ${canPreorder(p) && sizes.some(([, n]) => n <= 0) ? `<p class="small pre-key">Dashed sizes are out of stock — order now, ships in ${esc(leadTime(p))}.</p>` : ""}</div>
+        ${qtyPicker}
+        <div class="stock-note" id="stockNote"></div>
+        <button class="btn btn-accent btn-block" id="addBtn" disabled>Select a size</button>
+        <p class="small">This price is personal to you and works for one order${o.max_qty > 1 ? ` (up to ${o.max_qty} items)` : ""}. It can't be combined with other discount codes.</p>
+      </div></div>`;
+    $$("#productBody .size").forEach(b => b.onclick = () => {
+      $$("#productBody .size").forEach(x => x.classList.remove("sel"));
+      b.classList.add("sel"); selected = b.dataset.size;
+      const n = stockOf(p, selected);
+      $("#stockNote").textContent = n <= 0 ? `Out of stock — order now and it ships in ${leadTime(p)}` : "In stock";
+      $("#addBtn").disabled = false; $("#addBtn").textContent = (n <= 0 ? "Pre-order now — " : "Buy now — ") + money(o.price);
+    });
+    $("#addBtn").onclick = async () => {
+      const qty = o.max_qty > 1 ? parseInt($("#offerQty").value, 10) : 1;
+      const btn = $("#addBtn"); btn.disabled = true; btn.textContent = "Taking you to checkout…";
+      try { await Store.checkout([{ id: p.id, size: selected, qty, name: p.name, price: o.price }], undefined, o.token); }
+      catch (err) { toast(err.message); btn.disabled = false; btn.textContent = "Buy now — " + money(o.price); }
+    };
+    open("#productOverlay");
+  }
+  async function loadOffer(token) {
+    try {
+      const o = await Store.getOffer(token);
+      if (!o.valid) { offerBanner(`<strong>Friends & family offer</strong> ${esc(o.reason || "This offer isn't available.")}`); return; }
+      activeOffer = o;
+      offerBanner(`<strong>Friends & family price</strong> ${esc(o.product.name)} for ${money(o.price)} — just for you. <button class="link" id="offerOpen">View</button>`);
+      $("#offerOpen").onclick = () => openOffer(o);
+      openOffer(o);
+    } catch (err) { offerBanner(`<strong>Friends & family offer</strong> Couldn't load your offer — please try the link again.`); }
+  }
+
   // ---------- cart ----------
   function saveCart() { try { localStorage.setItem("hs_cart", JSON.stringify(cart)); } catch {} renderCart(); }
   function addToCart(p, size) {
@@ -192,6 +244,7 @@
     document.querySelector(".success").scrollIntoView({ behavior: "smooth" });
   }
 
+  if (params.get("offer") && params.get("checkout") !== "success") loadOffer(params.get("offer"));
   if (params.get("checkout") === "success") {
     cart = []; saveCart();
     // Same order number the confirmation email and admin use: ORD- + last 8 characters of the Stripe session ID

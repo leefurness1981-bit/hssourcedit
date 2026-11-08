@@ -3,7 +3,7 @@
   const { money, esc, imgTag, totalStock } = window.KERB;
   const $ = s => document.querySelector(s);
   const $$ = s => [...document.querySelectorAll(s)];
-  let products = [], orders = [], customers = [], campaigns = [];
+  let products = [], orders = [], customers = [], campaigns = [], offers = [];
 
   let tt;
   function toast(m) { const t = $("#toast"); t.textContent = m; t.classList.add("show"); clearTimeout(tt); tt = setTimeout(() => t.classList.remove("show"), 2800); }
@@ -45,6 +45,11 @@
       ]);
     } catch (err) { toast("Load failed: " + err.message); return; }
     renderDashboard(); renderStock(); renderOrders(); renderCustomers(); renderEmail();
+    loadOffers();
+  }
+  async function loadOffers() {
+    try { offers = await Store.getOffers(); } catch (err) { offers = []; console.warn("Offers unavailable:", err.message); }
+    renderOffers();
   }
 
   // ---------- tabs ----------
@@ -123,6 +128,11 @@
     f.elements.lead_time.value = p.lead_time || "5–8 business days";
     $("#sizeRows").innerHTML = Object.entries(p.sizes || {}).map(([s, n]) => sizeRow(s, n)).join("");
     $("#deleteProduct").hidden = !p.id;
+    f.elements.family_price.value = p.family_price ?? "";
+    $("#offerBox").hidden = !p.id; // offers need a saved product
+    $("#ofEmail").value = ""; $("#ofName").value = ""; $("#ofMsg").textContent = "";
+    $("#ofPrice").value = p.family_price ?? "";
+    $("#ofQty").value = "1"; $("#ofDays").value = "14";
     previewImg();
     open("#productEditor");
   }
@@ -152,7 +162,8 @@
       name: f.elements.name.value.trim(), category: f.elements.category.value, price: Number(f.elements.price.value),
       badge: f.elements.badge.value.trim(), image: f.elements.image.value.trim(), description: f.elements.description.value.trim(),
       active: f.elements.active.checked, sizes,
-      allow_backorder: f.elements.allow_backorder.checked, lead_time: f.elements.lead_time.value.trim() || "5–8 business days" };
+      allow_backorder: f.elements.allow_backorder.checked, lead_time: f.elements.lead_time.value.trim() || "5–8 business days",
+      family_price: f.elements.family_price.value === "" ? null : Number(f.elements.family_price.value) };
     if (!p.id) delete p.id;
     try { await Store.saveProduct(p); close("#productEditor"); toast("Product saved"); loadAll(); }
     catch (err) { toast(err.message); }
@@ -162,6 +173,61 @@
     if (!id || !confirm("Delete this product permanently? (Tip: untick 'Visible' to hide it instead.)")) return;
     await Store.deleteProduct(id); close("#productEditor"); toast("Product deleted"); loadAll();
   };
+
+  // ---------- friends & family offers ----------
+  $("#ofSend").onclick = async () => {
+    const id = $("#productForm").dataset.id;
+    const email = $("#ofEmail").value.trim(), price = $("#ofPrice").value;
+    const msg = $("#ofMsg");
+    if (!email) return (msg.textContent = "Enter their email address.");
+    if (price === "") return (msg.textContent = "Enter their price.");
+    const btn = $("#ofSend"); btn.disabled = true; msg.textContent = "Sending…";
+    try {
+      const res = await Store.sendOffer({ product_id: id, email, name: $("#ofName").value.trim(), price: Number(price),
+        max_qty: Number($("#ofQty").value), expires_days: Number($("#ofDays").value) });
+      msg.innerHTML = (res.emailed ? `✓ Sent to ${esc(email)}. ` : `⚠ ${esc(res.error || "Email failed")} — you can send them the link yourself: `)
+        + `<a href="${esc(res.url)}" target="_blank" rel="noopener">their link</a> <button type="button" class="copy-link" data-copy="${esc(res.url)}">copy link</button>`;
+      $("#ofEmail").value = ""; $("#ofName").value = "";
+      loadOffers();
+    } catch (err) { msg.textContent = "Couldn't send: " + err.message; }
+    btn.disabled = false;
+  };
+  document.addEventListener("click", e => {
+    const c = e.target.closest("[data-copy]"); if (!c) return;
+    try { navigator.clipboard.writeText(c.dataset.copy); toast("Link copied"); } catch { toast(c.dataset.copy); }
+  });
+  function offerStatus(o) {
+    if (o.status === "used") return ["used", "Used"];
+    if (o.status === "cancelled") return ["closed", "Cancelled"];
+    if (o.expires_at && new Date(o.expires_at) < new Date()) return ["closed", "Expired"];
+    if (o.status === "reserved") return ["open", "At checkout"];
+    return ["open", "Not used yet"];
+  }
+  function renderOffers() {
+    const f = $("#offerFilter").value;
+    const shop = location.origin + location.pathname.replace(/admin\.html$/, "");
+    const list = offers.filter(o => !f || offerStatus(o)[0] === f);
+    $("#offersTable").innerHTML = `<thead><tr><th>Sent</th><th>To</th><th>Item</th><th>Price</th><th>Expires</th><th>Status</th><th></th></tr></thead><tbody>` +
+      (list.length ? list.map(o => {
+        const [kind, label] = offerStatus(o);
+        const pill = kind === "used" ? "paid" : kind === "closed" ? "refunded" : "packed";
+        const link = `${shop}?offer=${encodeURIComponent(o.token)}`;
+        return `<tr>
+          <td>${fmtDate(o.created_at)}</td>
+          <td>${esc(o.name || "")}<div class="small">${esc(o.email)}</div></td>
+          <td>${esc(o.products?.name || o.product_id)}${o.max_qty > 1 ? `<div class="small">up to ${o.max_qty} items</div>` : ""}</td>
+          <td>${money(o.price)}</td>
+          <td>${o.expires_at ? fmtDate(o.expires_at) : "Never"}</td>
+          <td><span class="pill ${pill}">${label}</span>${o.order_id ? `<div class="small">${esc(o.order_id)}</div>` : ""}</td>
+          <td>${kind === "open" ? `<button class="copy-link" data-copy="${esc(link)}">copy link</button> <button class="copy-link" data-cancel="${esc(o.token)}">cancel</button>` : ""}</td></tr>`;
+      }).join("") : `<tr><td colspan="7" class="small">${Store.live ? "No offers yet. Open a product in Stock to send one." : "Offers work once the shop is live (connected to Supabase)."}</td></tr>`) + "</tbody>";
+  }
+  $("#offerFilter").onchange = renderOffers;
+  $("#offersTable").addEventListener("click", async e => {
+    const t = e.target.dataset.cancel; if (!t) return;
+    if (!confirm("Cancel this offer? The link will stop working.")) return;
+    try { await Store.cancelOffer(t); toast("Offer cancelled"); loadOffers(); } catch (err) { toast(err.message); }
+  });
 
   // ---------- orders ----------
   const STATUSES = ["paid", "packed", "shipped", "delivered", "refunded"];
@@ -176,7 +242,7 @@
     const list = orders.filter(o => !st || o.status === st);
     $("#ordersTable").innerHTML = `<thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th>Tracking</th></tr></thead><tbody>` +
       (list.length ? list.map(o => `<tr>
-        <td><strong>${esc(o.id)}</strong></td><td>${fmtDate(o.created_at)}</td>
+        <td><strong>${esc(o.id)}</strong>${o.offer_token ? `<div><span class="pill on">Friends & family</span></div>` : ""}</td><td>${fmtDate(o.created_at)}</td>
         <td>${esc(o.customer_name || "")}<div class="small">${esc(o.customer_email)}</div>${o.shipping_address ? `<div class="small">${esc(o.shipping_address)}</div>` : ""}</td>
         <td>${(o.items || []).map(i => `${i.qty}× ${esc(i.name)} <span class="small">(${esc(i.size)})</span>${i.backorder ? ` <span class="pill packed">pre-order · ${esc(i.lead_time || "")}</span>` : ""}`).join("<br>")}</td>
         <td>${money(o.total)}</td>

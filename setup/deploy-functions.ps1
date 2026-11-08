@@ -72,7 +72,7 @@ npx --yes supabase@latest secrets set --remote=$ProjectRef --yes @secrets
 
 Write-Host ""
 Write-Host "Step 4: uploading the functions..." -ForegroundColor Cyan
-$functions = @("subscribe", "create-checkout", "stripe-webhook", "order-update", "send-email", "unsubscribe")
+$functions = @("subscribe", "create-checkout", "stripe-webhook", "order-update", "send-email", "unsubscribe", "send-offer", "offer-info")
 foreach ($f in $functions) {
   Write-Host "  - $f"
   npx --yes supabase@latest functions deploy $f --remote=$ProjectRef --no-verify-jwt --use-api --yes

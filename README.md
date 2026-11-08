@@ -158,3 +158,6 @@ supabase/functions/   create-checkout, stripe-webhook, subscribe, order-update, 
   _shared/templates.js  ← email designs (wording lives here)
   _shared/email.ts      Brevo/Resend sending helpers
 ```
+
+## Friends & family offers
+Admin → Stock → open a product → **Send a friends & family offer**. Enter their email and price; they get a personal link for that one item. It works for one paid order, then stops. Track, copy or cancel links in **Admin → Offers**. Nothing needs setting up in Stripe: the server sends Stripe the offer price. Offers can't be combined with discount codes.

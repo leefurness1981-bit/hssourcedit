@@ -261,6 +261,30 @@ function campaignEmail({ inner, shopUrl, logoUrl, preheader = "" }) {
     footer: `You're receiving this because you signed up at HS Sourced It. {{unsubscribe}}` });
 }
 
+/** Personal friends & family offer: one product at a set price, one-time link. */
+function offerEmail({ name, productName, imageUrl, price, normalPrice, url, expiresAt, maxQty = 1, shopUrl, logoUrl }) {
+  const hi = first(name) ? `Hi ${esc(first(name))},` : "Hi,";
+  const exp = expiresAt ? new Date(expiresAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "";
+  const img = imageUrl
+    ? `<img src="${esc(imageUrl)}" width="504" alt="${esc(productName)}" style="display:block;width:100%;max-width:504px;height:auto;border:0;border-radius:4px;margin:6px 0 18px">`
+    : "";
+  const was = normalPrice && Number(normalPrice) > Number(price)
+    ? ` <span style="color:${C.muted};text-decoration:line-through;font-size:16px;font-weight:normal">${money(normalPrice)}</span>` : "";
+  const body = `
+    ${heading("Friends & family.")}
+    ${p(`${hi} here's a private price, just for you.`)}
+    ${img}
+    <p style="margin:0 0 4px;font-family:${C.font};font-size:17px;font-weight:bold;color:${C.text}">${esc(productName)}</p>
+    <p style="margin:0 0 14px;font-family:${C.font};font-size:26px;font-weight:900;color:${C.text}">${money(price)}${was}</p>
+    ${button(url, "Get it at this price")}
+    ${p(`This link is personal to you and works for <strong style="color:#fff">one order</strong>${maxQty > 1 ? ` (up to ${esc(maxQty)} items)` : " of one item"}.${exp ? ` It expires on <strong style="color:#fff">${esc(exp)}</strong>.` : ""} Please don't share it.`, `font-size:13px;color:${C.muted}`)}
+    ${p("Any questions? Just reply to this email.", `font-size:13px;color:${C.muted}`)}`;
+  return {
+    subject: `Your friends & family price: ${productName}`,
+    html: layout({ body, shopUrl, logoUrl, preheader: `${productName} for ${money(price)}, just for you.` }),
+  };
+}
+
 // ---------- function ----------
 // Admin-only: change an order's status / tracking, and email the customer when it ships.
 

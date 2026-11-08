@@ -30,6 +30,7 @@
         <button data-tab="stock">Stock</button>
         <button data-tab="orders">Orders</button>
         <button data-tab="customers">Customers</button>
+        <button data-tab="offers">Offers</button>
         <button data-tab="email">Email</button>
         <button data-tab="settings">Settings</button>
       </nav>
@@ -72,6 +73,13 @@
           <button class="btn btn-ghost" id="exportCustomers">Export CSV</button>
           <button class="btn btn-accent" id="addCustomer">+ Add customer</button></div>
         <div class="table-wrap"><table class="tbl" id="custTable"></table></div>
+      </section>
+
+      <!-- Friends & family offers -->
+      <section data-panel="offers" hidden>
+        <div class="head"><h1>Offers</h1><select id="offerFilter"><option value="">All</option><option value="open">Not used yet</option><option value="used">Used</option><option value="closed">Expired / cancelled</option></select></div>
+        <p class="small" style="margin:-.8rem 0 1rem">Friends & family links. To send a new one, open a product in <strong>Stock</strong>.</p>
+        <div class="table-wrap"><table class="tbl" id="offersTable"></table></div>
       </section>
 
       <!-- Email -->
@@ -154,12 +162,29 @@
         <label class="check"><input type="checkbox" name="active"> Visible in shop</label>
         <label class="check full"><input type="checkbox" name="allow_backorder"> Allow orders when a size is out of stock (pre-order)</label>
         <label class="full">Wait time shown for out-of-stock sizes <input name="lead_time" placeholder="5–8 business days"></label>
+        <label>Friends & family price (£) <input name="family_price" type="number" step="0.01" min="0" placeholder="Optional"></label>
       </div>
       <h3>Sizes & stock</h3>
       <div class="size-presets"><button type="button" class="chip" data-preset="shoe">UK shoe sizes</button><button type="button" class="chip" data-preset="clothing">XS–XXL</button><button type="button" class="chip" data-preset="one">One size</button></div>
       <div id="sizeRows" class="size-rows"></div>
       <button type="button" class="small" id="addSize">+ Add size</button>
       <div class="row-btns"><button type="button" class="btn btn-ghost danger" id="deleteProduct">Delete</button><button class="btn btn-accent">Save product</button></div>
+
+      <div class="offer-box" id="offerBox">
+        <h3>Send a friends & family offer</h3>
+        <p class="small">Emails a personal link for this item at your price. It works for one order, then stops working.</p>
+        <div class="form-grid">
+          <label>Their email <input type="email" id="ofEmail" placeholder="name@example.com"></label>
+          <label>Their first name (optional) <input id="ofName" placeholder="Jay"></label>
+          <label>Their price (£) <input type="number" step="0.01" min="0" id="ofPrice"></label>
+          <label>Max items
+            <select id="ofQty"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="5">5</option></select></label>
+          <label>Link expires
+            <select id="ofDays"><option value="7">After 7 days</option><option value="14" selected>After 14 days</option><option value="30">After 30 days</option><option value="0">Never</option></select></label>
+        </div>
+        <div class="row-btns"><button type="button" class="btn btn-accent" id="ofSend">Send offer</button></div>
+        <p class="small" id="ofMsg"></p>
+      </div>
     </form>
   </div>
 

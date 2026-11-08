@@ -262,6 +262,30 @@ function campaignEmail({ inner, shopUrl, logoUrl, preheader = "" }) {
     footer: `You're receiving this because you signed up at HS Sourced It. {{unsubscribe}}` });
 }
 
+/** Personal friends & family offer: one product at a set price, one-time link. */
+function offerEmail({ name, productName, imageUrl, price, normalPrice, url, expiresAt, maxQty = 1, shopUrl, logoUrl }) {
+  const hi = first(name) ? `Hi ${esc(first(name))},` : "Hi,";
+  const exp = expiresAt ? new Date(expiresAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "";
+  const img = imageUrl
+    ? `<img src="${esc(imageUrl)}" width="504" alt="${esc(productName)}" style="display:block;width:100%;max-width:504px;height:auto;border:0;border-radius:4px;margin:6px 0 18px">`
+    : "";
+  const was = normalPrice && Number(normalPrice) > Number(price)
+    ? ` <span style="color:${C.muted};text-decoration:line-through;font-size:16px;font-weight:normal">${money(normalPrice)}</span>` : "";
+  const body = `
+    ${heading("Friends & family.")}
+    ${p(`${hi} here's a private price, just for you.`)}
+    ${img}
+    <p style="margin:0 0 4px;font-family:${C.font};font-size:17px;font-weight:bold;color:${C.text}">${esc(productName)}</p>
+    <p style="margin:0 0 14px;font-family:${C.font};font-size:26px;font-weight:900;color:${C.text}">${money(price)}${was}</p>
+    ${button(url, "Get it at this price")}
+    ${p(`This link is personal to you and works for <strong style="color:#fff">one order</strong>${maxQty > 1 ? ` (up to ${esc(maxQty)} items)` : " of one item"}.${exp ? ` It expires on <strong style="color:#fff">${esc(exp)}</strong>.` : ""} Please don't share it.`, `font-size:13px;color:${C.muted}`)}
+    ${p("Any questions? Just reply to this email.", `font-size:13px;color:${C.muted}`)}`;
+  return {
+    subject: `Your friends & family price: ${productName}`,
+    html: layout({ body, shopUrl, logoUrl, preheader: `${productName} for ${money(price)}, just for you.` }),
+  };
+}
+
 // ---------- function ----------
 // Stripe → Supabase: when a payment completes, record the order,
 // reduce stock, update the customer's CRM record and email a receipt.
@@ -292,12 +316,18 @@ Deno.serve(async (req) => {
     if (existing) { console.log("Already processed", existing.id); return new Response("already processed"); }
 
     const meta: { id: string; size: string; qty: number; b?: number }[] = JSON.parse(s.metadata?.items ?? "[]");
+    const offerToken = s.metadata?.offer || null;
+    let offerPrice: number | null = null;
+    if (offerToken) {
+      const { data: o } = await db.from("offers").select("price").eq("token", offerToken).maybeSingle();
+      if (o) offerPrice = Number(o.price);
+    }
     const { data: products, error: prErr } = await db.from("products").select("id,name,price,lead_time").in("id", meta.map((m) => m.id));
     if (prErr) throw new Error("Reading products failed: " + prErr.message);
     const items = meta.map((m) => {
       const p = products?.find((x) => x.id === m.id);
       return {
-        id: m.id, name: p?.name ?? m.id, size: m.size, qty: m.qty, price: Number(p?.price ?? 0),
+        id: m.id, name: p?.name ?? m.id, size: m.size, qty: m.qty, price: offerPrice ?? Number(p?.price ?? 0),
         ...(m.b ? { backorder: true, lead_time: (p?.lead_time || "").trim() || "5–8 business days" } : {}),
       };
     });
@@ -318,10 +348,15 @@ Deno.serve(async (req) => {
 
     const { error: orderErr } = await db.from("orders").insert({
       id: orderId, stripe_session_id: s.id, customer_email: email, customer_name: name,
-      shipping_address: address, items, total, status: "paid",
+      shipping_address: address, items, total, status: "paid", offer_token: offerToken,
     });
     if (orderErr) throw new Error("Saving order failed: " + orderErr.message);
     console.log("Order saved", orderId, email, total);
+    if (offerToken) {
+      const { error: ofErr } = await db.from("offers").update({ status: "used", used_at: new Date().toISOString(), order_id: orderId })
+        .eq("token", offerToken);
+      if (ofErr) console.error("Marking offer used failed", ofErr.message); else console.log("Offer used", offerToken);
+    }
 
     // CRM upsert
     const { data: c } = await db.from("customers").select("*").eq("email", email).maybeSingle();

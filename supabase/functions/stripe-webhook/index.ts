@@ -30,12 +30,18 @@ Deno.serve(async (req) => {
     if (existing) { console.log("Already processed", existing.id); return new Response("already processed"); }
 
     const meta: { id: string; size: string; qty: number; b?: number }[] = JSON.parse(s.metadata?.items ?? "[]");
+    const offerToken = s.metadata?.offer || null;
+    let offerPrice: number | null = null;
+    if (offerToken) {
+      const { data: o } = await db.from("offers").select("price").eq("token", offerToken).maybeSingle();
+      if (o) offerPrice = Number(o.price);
+    }
     const { data: products, error: prErr } = await db.from("products").select("id,name,price,lead_time").in("id", meta.map((m) => m.id));
     if (prErr) throw new Error("Reading products failed: " + prErr.message);
     const items = meta.map((m) => {
       const p = products?.find((x) => x.id === m.id);
       return {
-        id: m.id, name: p?.name ?? m.id, size: m.size, qty: m.qty, price: Number(p?.price ?? 0),
+        id: m.id, name: p?.name ?? m.id, size: m.size, qty: m.qty, price: offerPrice ?? Number(p?.price ?? 0),
         ...(m.b ? { backorder: true, lead_time: (p?.lead_time || "").trim() || "5–8 business days" } : {}),
       };
     });
@@ -56,10 +62,15 @@ Deno.serve(async (req) => {
 
     const { error: orderErr } = await db.from("orders").insert({
       id: orderId, stripe_session_id: s.id, customer_email: email, customer_name: name,
-      shipping_address: address, items, total, status: "paid",
+      shipping_address: address, items, total, status: "paid", offer_token: offerToken,
     });
     if (orderErr) throw new Error("Saving order failed: " + orderErr.message);
     console.log("Order saved", orderId, email, total);
+    if (offerToken) {
+      const { error: ofErr } = await db.from("offers").update({ status: "used", used_at: new Date().toISOString(), order_id: orderId })
+        .eq("token", offerToken);
+      if (ofErr) console.error("Marking offer used failed", ofErr.message); else console.log("Offer used", offerToken);
+    }
 
     // CRM upsert
     const { data: c } = await db.from("customers").select("*").eq("email", email).maybeSingle();
