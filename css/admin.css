@@ -178,3 +178,4 @@ button.link { text-decoration: underline; color: var(--muted); }
 /* Dashboard numbers are buttons that open the matching list */
 .kpi-link { text-align: left; color: inherit; font: inherit; cursor: pointer; width: 100%; }
 .kpi-link:hover, .kpi-link:focus-visible { border-color: #fff; }
+#custCode .btn-sm { padding: .35rem .8rem; font-size: .75rem; margin-left: .5rem; vertical-align: middle; }

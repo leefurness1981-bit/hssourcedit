@@ -392,6 +392,27 @@
   });
   $("#custTable").addEventListener("click", e => { const r = e.target.closest("[data-email]"); if (r) editCustomer(r.dataset.email); });
   $("#addCustomer").onclick = () => editCustomer(null);
+  // Welcome code line on the customer record (+ a button to send one if it failed at sign-up)
+  function renderCustCode(c) {
+    const box = $("#custCode");
+    if (c.welcome_code) {
+      const exp = c.welcome_code_expires_at;
+      box.innerHTML = `Welcome code: <strong>${esc(c.welcome_code)}</strong>${exp ? ` · ${new Date(exp) < new Date() ? "expired" : "use by"} ${fmtDate(exp)}` : ""} <span class="small">(Stripe shows whether it's been used)</span>`;
+    } else if (c.welcome_code_failed_at) {
+      box.innerHTML = `Welcome code: <strong>none</strong> — it didn't generate at sign-up. <button type="button" class="btn btn-ghost btn-sm" id="sendCode">Send welcome code</button>`;
+      $("#sendCode").onclick = async () => {
+        const b = $("#sendCode"); b.disabled = true; b.textContent = "Sending…";
+        try {
+          const r = await Store.sendWelcomeCode(c.email);
+          Object.assign(c, { welcome_code: r.code, welcome_code_expires_at: r.expiresAt, welcome_code_failed_at: null });
+          toast(r.demo ? "Demo — no email sent" : `Sent ${r.code} to ${c.email} ✓`);
+          renderCustCode(c);
+        } catch (err) { toast(err.message); b.disabled = false; b.textContent = "Send welcome code"; }
+      };
+    } else if (c.marketing_opt_in) {
+      box.innerHTML = `Welcome code: <strong>none</strong> <span class="small">(joined before personal codes)</span>`;
+    } else box.innerHTML = "";
+  }
   function editCustomer(email) {
     const c = customers.find(x => x.email === email) || { name: "", email: "", phone: "", tags: [], notes: "", marketing_opt_in: false };
     const f = $("#custForm"); f.dataset.email = c.email;
@@ -400,8 +421,7 @@
     f.elements.marketing_opt_in.checked = !!c.marketing_opt_in;
     const theirs = orders.filter(o => o.customer_email === c.email);
     $("#custOrders").innerHTML = theirs.length ? theirs.map(o => `<button type="button" class="mini mini-link" data-goto="${esc(o.id)}"><span>${esc(o.id)} · ${fmtDate(o.created_at)}</span><span>${money(o.total)} <span class="pill ${o.status}">${o.status}</span> ›</span></button>`).join("") : "No orders yet.";
-    $("#custCode").innerHTML = c.welcome_code
-      ? `Welcome code: <strong>${esc(c.welcome_code)}</strong>${c.welcome_code_expires_at ? ` · ${new Date(c.welcome_code_expires_at) < new Date() ? "expired" : "use by"} ${fmtDate(c.welcome_code_expires_at)}` : ""} <span class="small">(Stripe shows whether it's been used)</span>` : "";
+    renderCustCode(c);
     $("#deleteCustomer").hidden = !c.email;
     open("#custEditor");
   }

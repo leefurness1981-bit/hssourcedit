@@ -408,8 +408,11 @@ Deno.serve(async (req) => {
       let code = "", expiresAt: Date | null = null;
       try {
         ({ code, expiresAt } = await createWelcomeCode(email));
-        await db.from("customers").update({ welcome_code: code, welcome_code_expires_at: expiresAt.toISOString() }).eq("email", email);
-      } catch (e) { console.error("welcome code failed — customer asked to reply for their code", e); }
+        await db.from("customers").update({ welcome_code: code, welcome_code_expires_at: expiresAt.toISOString(), welcome_code_failed_at: null }).eq("email", email);
+      } catch (e) {
+        console.error("welcome code failed — customer asked to reply for their code", e);
+        await db.from("customers").update({ welcome_code_failed_at: new Date().toISOString() }).eq("email", email);
+      }
       const { subject, html } = welcomeEmail({ name: cleanName, code, percent: PERCENT, expiresAt, shopUrl: SITE_URL, logoUrl: LOGO_URL });
       try {
         await sendMarketing(email, cleanName, subject, html, ["welcome"]);

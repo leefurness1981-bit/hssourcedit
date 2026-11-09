@@ -320,6 +320,11 @@
       ensureSeed();
       return ls.get("campaigns", []);
     },
+    // Create and email a personal welcome code for one subscriber (when it didn't generate at sign-up)
+    async sendWelcomeCode(email) {
+      if (LIVE) return fn("send-welcome-code", { email });
+      return { demo: true, code: "WELCOME-DEMO23", expiresAt: new Date(Date.now() + 30 * 86400000).toISOString() };
+    },
     async sendCampaign({ subject, inner, html, segment }) {
       if (LIVE) return fn("send-email", { subject, inner, segment });
       const customers = ls.get("customers", []).filter(c => c.marketing_opt_in && (segment === "all" || (c.tags || []).includes(segment)));
