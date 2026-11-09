@@ -204,3 +204,18 @@ create index if not exists customer_messages_email_idx on customer_messages (cus
 alter table customers add column if not exists welcome_code text;
 alter table customers add column if not exists welcome_code_expires_at timestamptz;
 alter table customers add column if not exists welcome_code_failed_at timestamptz;
+
+-- Editable website pages (Terms first). Edited in Admin > Settings; shown at /terms.html when published.
+create table if not exists site_pages (
+  slug text primary key,
+  title text not null default '',
+  body text not null default '',
+  published boolean not null default false,
+  updated_at timestamptz not null default now()
+);
+alter table site_pages enable row level security;
+drop policy if exists "public read published pages" on site_pages;
+create policy "public read published pages" on site_pages for select using (published or is_admin());
+drop policy if exists "admin write pages" on site_pages;
+create policy "admin write pages" on site_pages for all using (is_admin()) with check (is_admin());
+

@@ -325,6 +325,20 @@
       if (LIVE) return fn("send-welcome-code", { email });
       return { demo: true, code: "WELCOME-DEMO23", expiresAt: new Date(Date.now() + 30 * 86400000).toISOString() };
     },
+    // Editable pages (Terms etc.) — Admin > Settings
+    async getPage(slug) {
+      if (LIVE) { const rows = await q(client().from("site_pages").select("*").eq("slug", slug)); return rows[0] || null; }
+      return ls.get("pages", {})[slug] || null;
+    },
+    async savePage(page) {
+      const row = { ...page, updated_at: now() };
+      if (LIVE) return q(client().from("site_pages").upsert(row).select().single());
+      const all = ls.get("pages", {}); all[page.slug] = row; ls.set("pages", all); return row;
+    },
+    async publishedPages() {
+      if (LIVE) return q(client().from("site_pages").select("slug,title").eq("published", true));
+      return Object.values(ls.get("pages", {})).filter(p => p.published);
+    },
     async sendCampaign({ subject, inner, html, segment }) {
       if (LIVE) return fn("send-email", { subject, inner, segment });
       const customers = ls.get("customers", []).filter(c => c.marketing_opt_in && (segment === "all" || (c.tags || []).includes(segment)));

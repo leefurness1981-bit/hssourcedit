@@ -63,6 +63,7 @@
     $$("#tabs button").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
     $$("[data-panel]").forEach(p => (p.hidden = p.dataset.panel !== tab));
     window.scrollTo(0, 0);
+    if (tab === "settings") loadTermsEditor();
   }
   function goTab(tab) {
     if (tab === curTab) return;
@@ -515,6 +516,39 @@
   };
 
   // ---------- settings ----------
+  // ---------- Terms page editor (Settings) ----------
+  let termsLoaded = false;
+  async function loadTermsEditor() {
+    if (termsLoaded) return;
+    const f = $("#pageForm");
+    try {
+      const page = await Store.getPage("terms");
+      const d = (window.DEFAULT_PAGES || {}).terms || { title: "Terms of sale", body: "" };
+      f.elements.title.value = page ? page.title : d.title;
+      f.elements.body.value = page ? page.body : d.body;
+      f.elements.published.checked = !!(page && page.published);
+      $("#pageStatus").textContent = page ? `Last saved ${fmtDate(page.updated_at)} · ${page.published ? "showing on the site" : "not on the site yet"}` : "Not saved yet — this is the draft wording. Fill in the [bracketed] parts before showing it on the site.";
+      termsLoaded = true;
+    } catch (err) { $("#pageStatus").textContent = "Couldn't load the Terms page: " + err.message; }
+  }
+  $("#pagePreviewBtn").onclick = () => {
+    const f = $("#pageForm"), box = $("#pagePreview");
+    box.innerHTML = `<h2>${esc(f.elements.title.value)}</h2>` + renderMarkdown(f.elements.body.value);
+    box.hidden = false; box.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  $("#pageForm").onsubmit = async e => {
+    e.preventDefault(); const f = e.target, b = $("#pageSave");
+    if (f.elements.published.checked && /\[[^\]]+\]/.test(f.elements.body.value) &&
+        !confirm("The wording still has [bracketed] gaps to fill in. Show it on the site anyway?")) return;
+    b.disabled = true; b.textContent = "Saving…";
+    try {
+      const saved = await Store.savePage({ slug: "terms", title: f.elements.title.value.trim(), body: f.elements.body.value, published: f.elements.published.checked });
+      $("#pageStatus").textContent = `Last saved ${fmtDate(saved.updated_at)} · ${saved.published ? "showing on the site" : "not on the site yet"}`;
+      toast("Terms page saved ✓");
+    } catch (err) { toast(err.message); }
+    finally { b.disabled = false; b.textContent = "Save"; }
+  };
+
   $("#backupBtn").onclick = async () => {
     const data = await Store.exportAll();
     const a = document.createElement("a");

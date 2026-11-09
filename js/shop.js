@@ -296,6 +296,12 @@
     // refresh cart prices / drop removed products
     cart = cart.filter(l => products.some(p => p.id === l.id)).map(l => ({ ...l, price: products.find(p => p.id === l.id).price }));
     renderGrid(); renderCart();
+    // Footer link to the Terms page once it's switched on in Admin > Settings
+    Store.publishedPages().then(pages => {
+      if (!pages.some(p => p.slug === "terms") || $("#termsLink")) return;
+      const a = document.createElement("a"); a.id = "termsLink"; a.href = "terms.html"; a.textContent = "Terms";
+      $(".foot-links").insertBefore(a, $('.foot-links a[href="admin.html"]'));
+    }).catch(() => {});
     // Opened from a product link (?p=<id>): show that product; back then lands on the shop
     const pid = new URLSearchParams(location.search).get("p");
     if (pid) {

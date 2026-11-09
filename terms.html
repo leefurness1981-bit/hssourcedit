@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Terms of sale — HS Sourced It</title>
+  <meta name="description" content="Terms of sale for HS Sourced It.">
+  <link rel="icon" href="images/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css?v=202611091645">
+  <style>
+    .legal { max-width: 760px; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+    .legal-top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem; border-bottom: 1px solid #222; }
+    .legal-top img { height: 42px; }
+    .legal-top a.back { color: #fff; text-decoration: none; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: .8rem; border: 1px solid #fff; padding: .55rem 1rem; }
+    .legal h1 { font-family: Anton, Impact, sans-serif; font-weight: 400; text-transform: uppercase; font-size: clamp(2.2rem, 7vw, 3.4rem); line-height: 1; margin: 0 0 .6rem; }
+    .legal .updated { color: #8c8c8c; font-size: .85rem; margin: 0 0 2rem; }
+    .legal h2 { font-size: 1.15rem; margin: 2rem 0 .6rem; }
+    .legal h3 { font-size: 1rem; margin: 1.5rem 0 .5rem; }
+    .legal p, .legal li { color: #d4d4d4; line-height: 1.65; }
+    .legal p { margin: 0 0 1rem; }
+    .legal strong { color: #fff; }
+    .legal a { color: #fff; }
+    .legal ul { padding-left: 1.2rem; margin: 0 0 1rem; }
+  </style>
+</head>
+<body>
+  <header class="legal-top">
+    <a href="./"><img src="images/logo.png" alt="HS Sourced It"></a>
+    <a class="back" href="./">Back to shop</a>
+  </header>
+  <main class="legal">
+    <h1 id="title">Terms of sale</h1>
+    <p class="updated" id="updated"></p>
+    <div id="body"><p>Loading…</p></div>
+  </main>
+  <script src="js/config.js?v=202611091645"></script>
+  <script src="js/markdown.js?v=202611091645"></script>
+  <script>
+    (async () => {
+      const C = window.SHOP_CONFIG, slug = "terms";
+      const show = (title, body, updated) => {
+        document.getElementById("title").textContent = title;
+        document.title = title + " — HS Sourced It";
+        document.getElementById("updated").textContent = updated ? "Last updated " + new Date(updated).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "";
+        document.getElementById("body").innerHTML = body;
+      };
+      try {
+        let page = null;
+        if (C.supabaseUrl && C.supabaseAnonKey) {
+          const r = await fetch(`${C.supabaseUrl}/rest/v1/site_pages?slug=eq.${slug}&published=eq.true&select=title,body,updated_at`,
+            { headers: { apikey: C.supabaseAnonKey, Authorization: "Bearer " + C.supabaseAnonKey } });
+          if (r.ok) page = (await r.json())[0] || null;
+        } else {
+          try { page = (JSON.parse(localStorage.getItem("hs_pages") || "{}"))[slug] || null; if (page && !page.published) page = null; } catch (e) {}
+        }
+        if (page) show(page.title || "Terms of sale", renderMarkdown(page.body), page.updated_at);
+        else show("Terms of sale", "<p>Our terms of sale will be here soon. Questions? Email <a href=\"mailto:" + (C.contactEmail || "hello@hssourcedit.com") + "\">" + (C.contactEmail || "hello@hssourcedit.com") + "</a>.</p>");
+      } catch (e) {
+        show("Terms of sale", "<p>Couldn't load the terms right now. Please try again shortly.</p>");
+      }
+    })();
+  </script>
+</body>
+</html>
