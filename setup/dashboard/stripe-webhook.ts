@@ -397,6 +397,7 @@ Deno.serve(async (req) => {
       const { error: cuErr } = await db.from("customers").update({
         name: c.name || name, phone: c.phone || s.customer_details?.phone || "",
         total_spent: Number(c.total_spent) + total, order_count: c.order_count + 1,
+        tags: (c.tags || []).includes("customer") ? c.tags : [...(c.tags || []), "customer"],
       }).eq("email", email);
       if (cuErr) console.error("Customer update failed", cuErr.message);
     } else {
