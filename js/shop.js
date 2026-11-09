@@ -202,8 +202,24 @@
   };
 
   // ---------- overlays ----------
-  function open(sel) { $(sel).hidden = false; document.body.style.overflow = "hidden"; }
-  function close(sel) { $(sel).hidden = true; document.body.style.overflow = ""; }
+  // Popups add a step to the browser history, so the phone's back gesture closes the popup instead of leaving the site
+  let skipPop = false;
+  const anyOpen = () => $$(".overlay").some(o => !o.hidden);
+  function open(sel) {
+    const el = $(sel); el.hidden = false; document.body.style.overflow = "hidden";
+    const st = { overlay: el.id };
+    if (history.state && history.state.overlay) history.replaceState(st, ""); else history.pushState(st, "");
+  }
+  function close(sel) {
+    $(sel).hidden = true;
+    if (anyOpen()) return;
+    document.body.style.overflow = "";
+    if (history.state && history.state.overlay) { skipPop = true; history.back(); }
+  }
+  window.addEventListener("popstate", () => {
+    if (skipPop) { skipPop = false; return; }
+    $$(".overlay").forEach(o => (o.hidden = true)); document.body.style.overflow = "";
+  });
   $$(".overlay").forEach(o => o.addEventListener("click", e => {
     if (e.target === o || e.target.closest("[data-close]")) close("#" + o.id);
   }));
