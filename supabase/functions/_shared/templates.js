@@ -133,6 +133,7 @@ export function campaignEmail({ inner, shopUrl, logoUrl, preheader = "" }) {
     .replace(/<h2>/g, `<h2 style="margin:0 0 12px;font-family:${C.font};font-size:22px;line-height:1.2;font-weight:900;color:${C.text}">`)
     .replace(/<li>/g, `<li style="margin:0 0 6px;font-family:${C.font};font-size:15px;line-height:1.6;color:#d6d6d6">`)
     .replace(/<strong>/g, `<strong style="color:#ffffff">`)
+    .replace(/<img (?![^>]*style=)([^>]*?)\/?>/g, `<img $1 width="504" style="display:block;width:100%;max-width:504px;height:auto;border:0;border-radius:4px;margin:6px 0 16px">`)
     .replace(/<a (?![^>]*class="btn")([^>]*)>/g, `<a $1 style="color:#ffffff;text-decoration:underline">`)
     .replace(/<h1>/g, `<h1 style="margin:0 0 14px;font-family:${C.font};font-size:30px;line-height:1.1;font-weight:900;text-transform:uppercase;color:${C.text}">`)
     .replace(/<p>/g, `<p style="margin:0 0 14px;font-family:${C.font};font-size:15px;line-height:1.6;color:#d6d6d6">`)

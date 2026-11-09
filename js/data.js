@@ -176,10 +176,10 @@
     },
 
     // Product photo upload — resizes in the browser first (max 1200px, JPEG)
-    async uploadImage(file) {
+    async uploadImage(file, folder = "products") {
       const blob = await resizeImage(file, 1200, 0.82);
       if (LIVE) {
-        const path = `products/${Date.now()}-${uid()}.jpg`;
+        const path = `${folder}/${Date.now()}-${uid()}.jpg`;
         const s = client();
         const { error } = await s.storage.from("product-images").upload(path, blob, { contentType: "image/jpeg", cacheControl: "31536000" });
         if (error) throw new Error(error.message);

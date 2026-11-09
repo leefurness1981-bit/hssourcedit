@@ -505,6 +505,21 @@
     f.elements.html.value = t ? t.html : "";
     lastTemplate = e.target.value; preview();
   };
+  // Add a picture to a campaign: uploads it (resized) and drops an image line into the message at the cursor
+  $("#campImgBtn").onclick = () => $("#campImg").click();
+  $("#campImg").onchange = async e => {
+    const file = e.target.files[0]; e.target.value = ""; if (!file) return;
+    const b = $("#campImgBtn"); b.disabled = true; b.textContent = "Uploading…";
+    try {
+      const url = await Store.uploadImage(file, "email");
+      const ta = $("#campaignForm").elements.html, at = ta.selectionStart ?? ta.value.length;
+      const before = ta.value.slice(0, at).replace(/\s*$/, ""), after = ta.value.slice(at).replace(/^\s*/, "");
+      const tag = `<img src="${url}" alt="HS Sourced It">`;
+      ta.value = (before ? before + "\n\n" : "") + tag + (after ? "\n\n" + after : "\n\n");
+      ta.focus(); preview(); toast("Picture added ✓");
+    } catch (err) { toast("Couldn't add the picture: " + err.message); }
+    finally { b.disabled = false; b.textContent = "+ Add picture"; }
+  };
   // The preview updates as you type
   function preview() { $("#preview").srcdoc = fakeUnsub(wrapEmail($("#campaignForm").elements.html.value)); $("#previewSubject").textContent = "Subject: " + ($("#campaignForm").elements.subject.value || "—"); }
   $("#campaignForm").elements.html.oninput = preview;

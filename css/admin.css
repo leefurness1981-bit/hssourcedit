@@ -185,3 +185,5 @@ button.link { text-decoration: underline; color: var(--muted); }
 .page-editor code { background: #0d0d0d; padding: 0 .3rem; border-radius: 3px; }
 .page-preview { margin-top: 1rem; border: 1px solid var(--line); border-radius: 8px; padding: 1rem 1.2rem; max-height: 480px; overflow: auto; }
 .page-preview p { line-height: 1.6; color: #d4d4d4; }
+.camp-img { display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; margin: -.3rem 0 1rem; }
+.camp-img .btn-sm { padding: .45rem .9rem; font-size: .75rem; }
