@@ -239,7 +239,9 @@
   function renderOffers() {
     const f = $("#offerFilter").value;
     const shop = location.origin + location.pathname.replace(/admin\.html$/, "");
-    const list = offers.filter(o => !f || offerStatus(o)[0] === f);
+    const term = $("#offerSearch").value.trim().toLowerCase();
+    const text = o => [o.name, o.email, o.products?.name, o.product_id, o.note, o.order_id].join(" ").toLowerCase();
+    const list = offers.filter(o => (!f || offerStatus(o)[0] === f) && (!term || term.split(/\s+/).every(w => text(o).includes(w))));
     $("#offersTable").innerHTML = `<thead><tr><th>Sent</th><th>To</th><th>Item</th><th>Price</th><th>Expires</th><th>Status</th><th></th></tr></thead><tbody>` +
       (list.length ? list.map(o => {
         const [kind, label] = offerStatus(o);
@@ -253,9 +255,10 @@
           <td>${o.expires_at ? fmtDate(o.expires_at) : "Never"}</td>
           <td><span class="pill ${pill}">${label}</span>${o.order_id ? `<div class="small">${esc(o.order_id)}</div>` : ""}</td>
           <td>${kind === "open" ? `<button class="copy-link" data-copy="${esc(link)}">copy link</button> <button class="copy-link" data-cancel="${esc(o.token)}">cancel</button>` : ""}</td></tr>`;
-      }).join("") : `<tr><td colspan="7" class="small">${Store.live ? "No offers yet. Open a product in Stock to send one." : "Offers work once the shop is live (connected to Supabase)."}</td></tr>`) + "</tbody>";
+      }).join("") : `<tr><td colspan="7" class="small">${term || f ? "No offers match your search." : Store.live ? "No offers yet. Open a product in Stock to send one." : "Offers work once the shop is live (connected to Supabase)."}</td></tr>`) + "</tbody>";
   }
   $("#offerFilter").onchange = renderOffers;
+  $("#offerSearch").oninput = renderOffers;
   $("#offersTable").addEventListener("click", async e => {
     const t = e.target.dataset.cancel; if (!t) return;
     if (!confirm("Cancel this offer? The link will stop working.")) return;
@@ -303,7 +306,10 @@
   };
   function renderOrders() {
     const st = $("#orderFilter").value;
-    const list = orders.filter(o => !st || o.status === st);
+    const term = $("#orderSearch").value.trim().toLowerCase();
+    const text = o => [o.id, o.customer_name, o.customer_email, o.shipping_address, o.tracking_number, o.status,
+      ...(o.items || []).map(i => `${i.name} ${i.size}`)].join(" ").toLowerCase();
+    const list = orders.filter(o => (!st || o.status === st) && (!term || term.split(/\s+/).every(w => text(o).includes(w))));
     $("#ordersTable").innerHTML = `<thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th>Tracking</th></tr></thead><tbody>` +
       (list.length ? list.map(o => `<tr data-row="${esc(o.id)}" class="oc">
         <td class="oc-head"><strong>${esc(o.id)}</strong><span class="oc-date">${fmtDate(o.created_at)}</span><span class="oc-total">${money(o.total)}</span>${o.offer_token ? `<div><span class="pill on">Friends & family</span></div>` : ""}</td><td class="oc-hide">${fmtDate(o.created_at)}</td>
@@ -312,9 +318,10 @@
         <td class="oc-hide">${money(o.total)}</td>
         <td class="oc-status"><select data-oid="${esc(o.id)}">${STATUSES.map(s => `<option ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}</select></td>
         <td class="oc-track">${trackCell(o)}</td></tr>`).join("")
-      : `<tr><td colspan="7" class="small">No orders.</td></tr>`) + "</tbody>";
+      : `<tr><td colspan="7" class="small">${$("#orderSearch").value.trim() || $("#orderFilter").value ? "No orders match your search." : "No orders."}</td></tr>`) + "</tbody>";
   }
   $("#orderFilter").onchange = renderOrders;
+  $("#orderSearch").oninput = renderOrders;
   $("#ordersTable").addEventListener("change", async e => {
     const id = e.target.dataset.oid; if (!id) return;
     const o = orders.find(x => x.id === id);
