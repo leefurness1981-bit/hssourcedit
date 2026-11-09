@@ -112,14 +112,14 @@
     const term = $("#stockSearch").value.toLowerCase();
     const list = products.filter(p => (p.name + p.category).toLowerCase().includes(term));
     $("#stockTable").innerHTML = `<thead><tr><th></th><th>Product</th><th>Price</th><th>Stock by size (edit inline)</th><th>Total</th><th>Status / when out of stock</th></tr></thead><tbody>` +
-      list.map(p => `<tr>
-        <td>${imgTag(p.image, p.name, "thumb")}</td>
-        <td><a href="#" data-edit="${esc(p.id)}"><strong>${esc(p.name)}</strong></a><div class="small">${esc(p.category)}</div>${p.active ? `<button type="button" class="link small copy-link" data-link="${esc(p.id)}">🔗 Copy link</button>` : ""}</td>
-        <td>${money(p.price)}</td>
-        <td><div class="stock-cells">${sizeEntries(p).map(([s, n]) =>
+      list.map(p => `<tr class="pc">
+        <td class="pc-img">${imgTag(p.image, p.name, "thumb")}</td>
+        <td class="pc-name"><a href="#" data-edit="${esc(p.id)}"><strong>${esc(p.name)}</strong></a><div class="small">${esc(p.category)}</div>${p.active ? `<button type="button" class="link small copy-link" data-link="${esc(p.id)}">🔗 Copy link</button>` : ""}</td>
+        <td class="pc-price">${money(p.price)}</td>
+        <td class="pc-sizes"><div class="stock-cells">${sizeEntries(p).map(([s, n]) =>
           `<label class="sc ${n == 0 ? "zero" : n <= C.lowStockThreshold ? "low" : ""}"><small>${esc(s)}</small><input type="number" min="0" value="${n}" data-pid="${esc(p.id)}" data-size="${esc(s)}"></label>`).join("")}</div></td>
-        <td><strong>${totalStock(p)}</strong></td>
-        <td>${p.active ? '<span class="pill on">Live</span>' : '<span class="pill">Hidden</span>'}
+        <td class="pc-total"><strong>${totalStock(p)}</strong><span class="pc-label"> in stock</span></td>
+        <td class="pc-status">${p.active ? '<span class="pill on">Live</span>' : '<span class="pill">Hidden</span>'}
           <div class="small" style="margin-top:.3rem">${p.allow_backorder !== false ? "Pre-order: " + esc(p.lead_time || "5–8 business days") : "No pre-orders"}</div>
           <div class="small">Delivery: ${money(p.shipping_cost ?? C.shippingCost)}</div></td></tr>`).join("") + "</tbody>";
   }
