@@ -121,3 +121,31 @@ button.link { text-decoration: underline; color: var(--muted); }
 #msgHistory .msg, .msg-list .msg { border: 1px solid var(--line); border-radius: 6px; padding: .6rem .75rem; margin-bottom: .5rem; }
 .msg-list .msg.in { border-color: #555; background: #1a1a1a; }
 .msg-list .msg-body { white-space: pre-wrap; margin-top: .3rem; color: #d6d6d6; }
+.oc-head .oc-date, .oc-head .oc-total { display: none; }
+@media (max-width: 760px) {
+  #ordersTable, #ordersTable tbody { display: block; }
+  #ordersTable thead { display: none; }
+  .table-wrap:has(#ordersTable) { overflow: visible; border: 0; background: none; }
+  #ordersTable tr.oc { display: grid; grid-template-columns: 1fr auto; gap: .2rem .8rem; background: var(--card, #141414); border: 1px solid var(--line); border-radius: 10px; padding: 1rem; margin-bottom: .9rem; }
+  #ordersTable tr.oc td { display: block; padding: 0; border: 0; }
+  #ordersTable .oc-hide { display: none !important; }
+  .oc-head { grid-column: 1 / -1; display: flex !important; flex-wrap: wrap; align-items: baseline; gap: .35rem .7rem; padding-bottom: .7rem !important; border-bottom: 1px solid var(--line) !important; }
+  .oc-head strong { font-size: 1.05rem; }
+  .oc-head .oc-date { display: inline; color: var(--muted); font-size: .85rem; }
+  .oc-head .oc-total { display: inline; margin-left: auto; font-weight: 800; font-size: 1.1rem; }
+  .oc-head > div { width: 100%; }
+  .oc-items { grid-column: 1 / -1; padding-top: .7rem !important; }
+  .oc-item { padding: .15rem 0 .45rem; }
+  .oc-cust { grid-column: 1 / -1; padding-top: .5rem !important; border-top: 1px solid var(--line) !important; margin-top: .3rem; }
+  .oc-status { grid-column: 1; padding-top: .8rem !important; }
+  .oc-status select { width: 100%; }
+  .oc-track { grid-column: 2; padding-top: .8rem !important; align-self: center; text-align: right; }
+}
+@media (max-width: 760px) {
+  .oc-items { order: 2; } .oc-cust { order: 3; border-top: 1px solid var(--line) !important; margin-top: .4rem; padding-top: .8rem !important; }
+  .oc-status { order: 4; } .oc-track { order: 5; }
+  .oc-head { padding-bottom: .8rem !important; }
+  .oc-item .pill.wait { padding: .2rem .55rem; margin-top: .35rem; }
+}
+@media (max-width: 760px) { #ordersTable tr.oc.flash { animation: cardflash 2.4s ease-out; } #ordersTable tr.oc.flash td { animation: none; } }
+@keyframes cardflash { 0%, 40% { background: #3a3a3a; } 100% { background: var(--card, #141414); } }
