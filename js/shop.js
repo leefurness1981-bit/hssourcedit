@@ -41,10 +41,9 @@
     if (!list.length) { $("#grid").innerHTML = `<p class="empty">Nothing here yet — check back for the next drop.</p>`; return; }
     $("#grid").innerHTML = list.map((p, i) => {
       const stock = totalStock(p);
-      // No "Order now" or "New" labels; "Sold out" only when ordering is switched off, plus any other badge set in admin (e.g. Sale)
+      // The card label is exactly what's in the product's Badge box in admin (blank = no label); stock never changes it
       const custom = (p.badge || "").trim();
-      const badge = stock === 0 && !canPreorder(p) ? `<span class="badge out">Sold out</span>`
-        : custom && custom.toLowerCase() !== "new" ? `<span class="badge ${custom.toLowerCase() === "sale" ? "sale" : ""}">${esc(custom)}</span>` : "";
+      const badge = custom ? `<span class="badge ${custom.toLowerCase() === "sale" ? "sale" : ""}">${esc(custom)}</span>` : "";
       const low = stock > 0 && stock <= C.lowStockThreshold * 2 ? `<div class="low">Selling fast</div>` : "";
       return `<article class="card" data-id="${esc(p.id)}" style="animation-delay:${i * 40}ms" tabindex="0">
         <div class="card-img">${imgTag(p.image, p.name)}${badge}<div class="quick">Quick view</div></div>
