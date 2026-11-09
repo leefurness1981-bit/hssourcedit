@@ -7,8 +7,8 @@
   <title>HS Sourced It — Admin</title>
   <link rel="icon" href="images/favicon.png">
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Source+Serif+4:opsz,wght@8..60,900&family=Archivo:wght@400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=202611091207">
-  <link rel="stylesheet" href="css/admin.css?v=202611091207">
+  <link rel="stylesheet" href="css/style.css?v=202611091458">
+  <link rel="stylesheet" href="css/admin.css?v=202611091458">
 </head>
 <body class="admin">
   <!-- Login -->
@@ -48,8 +48,8 @@
         <h1>Dashboard</h1>
         <div class="kpis" id="kpis"></div>
         <div class="two">
-          <div class="panel"><h3>Low stock</h3><div id="lowStock"></div></div>
           <div class="panel"><h3>Recent orders</h3><div id="recentOrders"></div></div>
+          <div class="panel"><h3>In stock now</h3><div id="lowStock"></div></div>
         </div>
       </section>
 
@@ -63,14 +63,14 @@
       <section data-panel="orders" hidden>
         <div class="head"><h1>Orders</h1>
           <input type="search" id="orderSearch" placeholder="Search order no., name, email, item, postcode">
-          <select id="orderFilter"><option value="">All statuses</option><option>paid</option><option>packed</option><option>shipped</option><option>delivered</option><option>refunded</option></select>
+          <select id="orderFilter"><option value="">All statuses</option><option value="toship">To ship (paid + packed)</option><option>paid</option><option>packed</option><option>shipped</option><option>delivered</option><option>refunded</option></select>
           <button class="btn btn-ghost" id="exportOrders">Export CSV</button></div>
         <div class="table-wrap"><table class="tbl" id="ordersTable"></table></div>
       </section>
 
       <!-- Customers -->
       <section data-panel="customers" hidden>
-        <div class="head"><h1>Customers</h1><input type="search" id="custSearch" placeholder="Search name, email or tag">
+        <div class="head"><h1>Customers</h1><input type="search" id="custSearch" placeholder="Search name, email or tag"><select id="custFilter"><option value="">All customers</option><option value="subs">Subscribed to marketing</option><option value="buyers">Have ordered</option></select>
           <button class="btn btn-ghost" id="exportCustomers">Export CSV</button>
           <button class="btn btn-accent" id="addCustomer">+ Add customer</button></div>
         <div class="table-wrap"><table class="tbl" id="custTable"></table></div>
@@ -250,10 +250,10 @@
 
   <div class="toast" id="toast"></div>
 
-  <script src="js/config.js?v=202611091207"></script>
+  <script src="js/config.js?v=202611091458"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/data.js?v=202611091207"></script>
-  <script src="js/admin.js?v=202611091207"></script>
+  <script src="js/data.js?v=202611091458"></script>
+  <script src="js/admin.js?v=202611091458"></script>
   <script type="module">
     import * as T from "./supabase/functions/_shared/templates.js";
     window.EMAIL_T = T;

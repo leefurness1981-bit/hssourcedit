@@ -175,3 +175,6 @@ button.link { text-decoration: underline; color: var(--muted); }
   .pc-status .pill { margin-right: .6rem; }
 }
 @media (max-width: 760px) { .pc-name .copy-link { padding: 0; } }
+/* Dashboard numbers are buttons that open the matching list */
+.kpi-link { text-align: left; color: inherit; font: inherit; cursor: pointer; width: 100%; }
+.kpi-link:hover, .kpi-link:focus-visible { border-color: #fff; }

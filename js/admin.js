@@ -96,13 +96,14 @@
     $("#kpis").innerHTML = [
       ["Revenue (all time)", money(revenue)], ["This month", money(monthRev)], ["Orders to ship", toShip],
       ["Units in stock", units], ["Customers", customers.length], ["Subscribers", subs]
-    ].map(([l, v]) => `<div class="kpi"><div class="label">${l}</div><div class="val">${v}</div></div>`).join("");
+    ].map(([l, v], i) => `<button type="button" class="kpi kpi-link" data-kpi="${i}"><div class="label">${l}</div><div class="val">${v}</div></button>`).join("");
 
-    const low = [];
-    products.forEach(p => sizeEntries(p).forEach(([s, n]) => { if (n <= C.lowStockThreshold) low.push({ p, s, n }); }));
-    $("#lowStock").innerHTML = low.length ? low.sort((a, b) => a.n - b.n).slice(0, 12).map(({ p, s, n }) =>
-      `<button type="button" class="mini mini-link" data-goprod="${esc(p.id)}"><span>${esc(p.name)} — ${esc(s)}</span><span><span class="pill ${n === 0 ? "refunded" : "packed"}">${n === 0 ? "Out" : n + " left"}</span> ›</span></button>`).join("")
-      : `<p class="small">All sizes healthy.</p>`;
+    // What he actually has on the shelf (sizes with 1+ in stock), grouped by product
+    const have = [];
+    products.forEach(p => sizeEntries(p).forEach(([s, n]) => { if (n > 0) have.push({ p, s, n }); }));
+    $("#lowStock").innerHTML = have.length ? have.map(({ p, s, n }) =>
+      `<button type="button" class="mini mini-link" data-goprod="${esc(p.id)}"><span>${esc(p.name)} — ${esc(s)}${p.active ? "" : ' <span class="small">(hidden)</span>'}</span><span><span class="pill ${n <= C.lowStockThreshold ? "packed" : "on"}">${n} in stock</span> ›</span></button>`).join("")
+      : `<p class="small">Nothing in stock right now — everything is ordered in.</p>`;
     $("#recentOrders").innerHTML = orders.length ? orders.slice(0, 6).map(o =>
       `<button type="button" class="mini mini-link" data-goto="${esc(o.id)}"><span>${esc(o.id)} · ${esc(o.customer_email)}</span><span>${money(o.total)} <span class="pill ${o.status}">${o.status}</span> ›</span></button>`).join("")
       : `<p class="small">No orders yet.</p>`;
@@ -329,7 +330,7 @@
     const term = $("#orderSearch").value.trim().toLowerCase();
     const text = o => [o.id, o.customer_name, o.customer_email, o.shipping_address, o.tracking_number, o.status,
       ...(o.items || []).map(i => `${i.name} ${i.size}`)].join(" ").toLowerCase();
-    const list = orders.filter(o => (!st || o.status === st) && (!term || term.split(/\s+/).every(w => text(o).includes(w))));
+    const list = orders.filter(o => (!st || (st === "toship" ? (o.status === "paid" || o.status === "packed") : o.status === st)) && (!term || term.split(/\s+/).every(w => text(o).includes(w))));
     $("#ordersTable").innerHTML = `<thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th>Tracking</th></tr></thead><tbody>` +
       (list.length ? list.map(o => `<tr data-row="${esc(o.id)}" class="oc">
         <td class="oc-head"><strong>${esc(o.id)}</strong><span class="oc-date">${fmtDate(o.created_at)}</span><span class="oc-total">${money(o.total)}</span>${o.offer_token ? `<div><span class="pill on">Friends & family</span></div>` : ""}</td><td class="oc-hide">${fmtDate(o.created_at)}</td>
@@ -387,7 +388,9 @@
   // ---------- customers / CRM ----------
   function renderCustomers() {
     const term = $("#custSearch").value.toLowerCase();
-    const list = customers.filter(c => [c.name, c.email, (c.tags || []).join(" ")].join(" ").toLowerCase().includes(term));
+    const cf = $("#custFilter").value;
+    const list = customers.filter(c => [c.name, c.email, (c.tags || []).join(" ")].join(" ").toLowerCase().includes(term)
+      && (!cf || (cf === "subs" ? c.marketing_opt_in : (c.order_count > 0 || orders.some(o => o.customer_email === c.email)))));
     $("#custTable").innerHTML = `<thead><tr><th>Customer</th><th>Tags</th><th>Orders</th><th>Spent</th><th>Marketing</th><th>Joined</th></tr></thead><tbody>` +
       (list.length ? list.map(c => `<tr class="click" data-email="${esc(c.email)}">
         <td><strong>${esc(c.name || "—")}</strong><div class="small">${esc(c.email)}</div></td>
@@ -398,6 +401,15 @@
       : `<tr><td colspan="6" class="small">No customers yet.</td></tr>`) + "</tbody>";
   }
   $("#custSearch").oninput = renderCustomers;
+  $("#custFilter").onchange = renderCustomers;
+  // Dashboard numbers open the matching list
+  $("#kpis").addEventListener("click", e => {
+    const k = e.target.closest("[data-kpi]"); if (!k) return;
+    const i = Number(k.dataset.kpi);
+    if (i <= 2) { goTab("orders"); $("#orderSearch").value = ""; $("#orderFilter").value = i === 2 ? "toship" : ""; renderOrders(); }
+    else if (i === 3) { goTab("stock"); }
+    else { goTab("customers"); $("#custSearch").value = ""; $("#custFilter").value = i === 5 ? "subs" : ""; renderCustomers(); }
+  });
   $("#custTable").addEventListener("click", e => { const r = e.target.closest("[data-email]"); if (r) editCustomer(r.dataset.email); });
   $("#addCustomer").onclick = () => editCustomer(null);
   function editCustomer(email) {
