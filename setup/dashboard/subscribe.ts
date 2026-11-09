@@ -187,7 +187,7 @@ function layout({ body, shopUrl, logoUrl, preheader = "", footer = "" }) {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.bg}"><tr><td align="center" style="padding:28px 14px">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px">
     <tr><td align="center" style="padding:0 0 18px"><a href="${esc(shopUrl)}"><img src="${esc(logoUrl)}" width="300" alt="HS SOURCED IT" style="display:block;width:300px;max-width:80%;height:auto;border:0;color:#fff;font-family:${C.serif};font-size:26px;font-weight:bold"></a></td></tr>
-    <tr><td style="background:${C.card};border:1px solid ${C.line};border-radius:6px;padding:32px 28px">${body}</td></tr>
+    <tr><td style="background:${C.card};border:1px solid ${C.line};border-radius:6px;padding:32px 28px;font-family:${C.font};font-size:15px;line-height:1.6;color:#d6d6d6">${body}</td></tr>
     <tr><td align="center" style="padding:20px 10px;font-family:${C.font};font-size:12px;line-height:1.6;color:#777">
       HS Sourced It · <a href="${esc(shopUrl)}" style="color:#999">Visit the shop</a>${footer ? "<br>" + footer : ""}
     </td></tr>
@@ -264,8 +264,17 @@ function orderShippedEmail({ orderId, name, items, carrier, trackingNumber, shop
 
 /** Wraps a campaign written in admin. `inner` is HTML; SHOP_URL inside it is replaced. */
 function campaignEmail({ inner, shopUrl, logoUrl, preheader = "" }) {
-  const body = String(inner)
+  let src = String(inner).replace(/\r/g, "").trim();
+  // Plain text typed without HTML: blank line = new paragraph, single line break kept
+  if (!/<(p|h[1-6]|ul|ol|div|table|br)\b/i.test(src)) {
+    src = src.split(/\n{2,}/).map((para) => `<p>${para.replace(/\n/g, "<br>")}</p>`).join("\n");
+  }
+  const body = src
     .replaceAll("SHOP_URL", shopUrl)
+    .replace(/<h2>/g, `<h2 style="margin:0 0 12px;font-family:${C.font};font-size:22px;line-height:1.2;font-weight:900;color:${C.text}">`)
+    .replace(/<li>/g, `<li style="margin:0 0 6px;font-family:${C.font};font-size:15px;line-height:1.6;color:#d6d6d6">`)
+    .replace(/<strong>/g, `<strong style="color:#ffffff">`)
+    .replace(/<a (?![^>]*class="btn")([^>]*)>/g, `<a $1 style="color:#ffffff;text-decoration:underline">`)
     .replace(/<h1>/g, `<h1 style="margin:0 0 14px;font-family:${C.font};font-size:30px;line-height:1.1;font-weight:900;text-transform:uppercase;color:${C.text}">`)
     .replace(/<p>/g, `<p style="margin:0 0 14px;font-family:${C.font};font-size:15px;line-height:1.6;color:#d6d6d6">`)
     .replace(/<a ([^>]*)class="btn"([^>]*)>/g, `<a $1$2 style="display:inline-block;margin:10px 0;padding:14px 26px;border:2px solid #ffffff;color:#ffffff;font-family:${C.font};font-size:14px;font-weight:bold;letter-spacing:1.5px;text-transform:uppercase;text-decoration:none;border-radius:3px">`);
