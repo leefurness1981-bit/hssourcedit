@@ -375,10 +375,6 @@
     f.elements.marketing_opt_in.checked = !!c.marketing_opt_in;
     const theirs = orders.filter(o => o.customer_email === c.email);
     $("#custOrders").innerHTML = theirs.length ? theirs.map(o => `<button type="button" class="mini mini-link" data-goto="${esc(o.id)}"><span>${esc(o.id)} · ${fmtDate(o.created_at)}</span><span>${money(o.total)} <span class="pill ${o.status}">${o.status}</span> ›</span></button>`).join("") : "No orders yet.";
-    const theirMsgs = messages.filter(m => m.customer_email === (c.email || "").toLowerCase());
-    $("#custMsgs").innerHTML = theirMsgs.length ? theirMsgs.map(m => `<div class="msg ${m.direction === "in" ? "in" : "out"}">
-        <div class="small">${m.direction === "in" ? "From customer" : "Sent"} · ${fmtDate(m.created_at)}${m.order_id ? ` · <button type="button" class="link small" data-goto="${esc(m.order_id)}">${esc(m.order_id)}</button>` : ""}</div>
-        <div><strong>${esc(m.subject)}</strong></div><div class="msg-body">${esc(m.body)}</div></div>`).join("") : "No messages yet.";
     $("#deleteCustomer").hidden = !c.email;
     open("#custEditor");
   }
@@ -395,7 +391,6 @@
   $("#recentOrders").addEventListener("click", e => { const b = e.target.closest("[data-goto]"); if (b) goToOrder(b.dataset.goto); });
   $("#lowStock").addEventListener("click", e => { const b = e.target.closest("[data-goprod]"); if (b) { goTab("stock"); editProduct(b.dataset.goprod); } });
   $("#custOrders").addEventListener("click", e => { const b = e.target.closest("[data-goto]"); if (b) goToOrder(b.dataset.goto); });
-  $("#custMsgs").addEventListener("click", e => { const b = e.target.closest("[data-goto]"); if (b) goToOrder(b.dataset.goto); });
   $("#custForm").onsubmit = async e => {
     e.preventDefault(); const f = e.target;
     const existing = customers.find(x => x.email === f.dataset.email) || {};
