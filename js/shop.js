@@ -62,14 +62,13 @@
       <div class="pm-info">
         <p class="eyebrow">${esc(p.category)}</p>
         <h2>${esc(p.name)}</h2>
-        <div class="pm-price">${money(p.price)}</div>
+        <div class="pm-price-row"><div class="pm-price">${money(p.price)}</div><button type="button" class="share-btn" id="shareBtn">Share ↗</button></div>
         <p class="small">Delivery ${shipCostOf(p) > 0 ? money(shipCostOf(p)) : "free"} · free when you order ${FREE_N}+ items</p>
         <p class="pm-desc">${esc(p.description)}</p>
         <div><p class="small" style="margin-bottom:.5rem">SELECT SIZE</p>
           <div class="sizes">${sizes.map(([s, n]) => `<button class="size ${n > 0 ? "" : "pre"}" data-size="${esc(s)}" ${n > 0 || canPreorder(p) ? "" : "disabled"} title="${n > 0 ? "In stock" : canPreorder(p) ? "Ships in " + esc(leadTime(p)) : "Sold out"}">${esc(s)}</button>`).join("")}</div></div>
         <div class="stock-note" id="stockNote"></div>
         <button class="btn btn-accent btn-block" id="addBtn" disabled>Select a size</button>
-        <button type="button" class="share-btn" id="shareBtn">Share this item ↗</button>
       </div></div>`;
     $("#shareBtn").onclick = () => shareProduct(p);
     $$("#productBody .size").forEach(b => b.onclick = () => {
