@@ -69,7 +69,9 @@
           <div class="sizes">${sizes.map(([s, n]) => `<button class="size ${n > 0 ? "" : "pre"}" data-size="${esc(s)}" ${n > 0 || canPreorder(p) ? "" : "disabled"} title="${n > 0 ? "In stock" : canPreorder(p) ? "Ships in " + esc(leadTime(p)) : "Sold out"}">${esc(s)}</button>`).join("")}</div></div>
         <div class="stock-note" id="stockNote"></div>
         <button class="btn btn-accent btn-block" id="addBtn" disabled>Select a size</button>
+        <button type="button" class="share-btn" id="shareBtn">Share this item ↗</button>
       </div></div>`;
+    $("#shareBtn").onclick = () => shareProduct(p);
     $$("#productBody .size").forEach(b => b.onclick = () => {
       $$("#productBody .size").forEach(x => x.classList.remove("sel"));
       b.classList.add("sel"); selected = b.dataset.size;
@@ -79,7 +81,19 @@
       $("#addBtn").disabled = false; $("#addBtn").textContent = "Add to bag — " + money(p.price);
     });
     $("#addBtn").onclick = () => { addToCart(p, selected); close("#productOverlay"); };
-    open("#productOverlay");
+    open("#productOverlay", "?p=" + encodeURIComponent(p.id));
+  }
+
+  // ---------- product links ----------
+  // Shareable link: /p/<id>/ is a small page with the product's photo/title for link previews
+  // (Snapchat, WhatsApp, TikTok bio…) that forwards to /?p=<id>, which opens the product.
+  const SITE = location.origin + location.pathname.replace(/[^/]*$/, "");
+  const productLink = p => `${SITE}p/${encodeURIComponent(p.id)}/`;
+  async function shareProduct(p) {
+    const url = productLink(p);
+    if (navigator.share) { try { await navigator.share({ title: p.name, text: `${p.name} — ${money(p.price)}`, url }); return; } catch (e) { if (e.name === "AbortError") return; } }
+    try { await navigator.clipboard.writeText(url); toast("Link copied"); }
+    catch { prompt("Copy this link:", url); }
   }
 
   // ---------- friends & family offer (one-time link: ?offer=TOKEN) ----------
@@ -204,10 +218,11 @@
   // Popups add a step to the browser history, so the phone's back gesture closes the popup instead of leaving the site
   let skipPop = false;
   const anyOpen = () => $$(".overlay").some(o => !o.hidden);
-  function open(sel) {
+  function open(sel, url) {
     const el = $(sel); el.hidden = false; document.body.style.overflow = "hidden";
     const st = { overlay: el.id };
-    if (history.state && history.state.overlay) history.replaceState(st, ""); else history.pushState(st, "");
+    const u = url || (history.state && history.state.overlay ? location.pathname : undefined);
+    if (history.state && history.state.overlay) history.replaceState(st, "", u); else history.pushState(st, "", u);
   }
   function close(sel) {
     $(sel).hidden = true;
@@ -282,5 +297,12 @@
     // refresh cart prices / drop removed products
     cart = cart.filter(l => products.some(p => p.id === l.id)).map(l => ({ ...l, price: products.find(p => p.id === l.id).price }));
     renderGrid(); renderCart();
+    // Opened from a product link (?p=<id>): show that product; back then lands on the shop
+    const pid = new URLSearchParams(location.search).get("p");
+    if (pid) {
+      history.replaceState(null, "", location.pathname);
+      if (products.some(p => p.id === pid)) openProduct(pid);
+      else toast("Sorry — that item isn't available any more.");
+    }
   })();
 })();

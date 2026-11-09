@@ -225,3 +225,6 @@ select { background: var(--panel); border: 1px solid var(--line); padding: .5rem
 .pm-img img { max-width: 100%; }
 @media (max-width: 860px) { .pm { grid-template-columns: minmax(0, 1fr); } }
 .pm-info, .pm-info * { overflow-wrap: anywhere; }
+/* Share button in the product popup */
+.share-btn { background: none; border: 0; color: var(--muted, #9a9a9a); font: inherit; font-size: .85rem; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; padding: .6rem 0; align-self: center; }
+.share-btn:hover { color: #fff; }

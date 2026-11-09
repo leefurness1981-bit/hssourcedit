@@ -114,7 +114,7 @@
     $("#stockTable").innerHTML = `<thead><tr><th></th><th>Product</th><th>Price</th><th>Stock by size (edit inline)</th><th>Total</th><th>Status / when out of stock</th></tr></thead><tbody>` +
       list.map(p => `<tr>
         <td>${imgTag(p.image, p.name, "thumb")}</td>
-        <td><a href="#" data-edit="${esc(p.id)}"><strong>${esc(p.name)}</strong></a><div class="small">${esc(p.category)}</div></td>
+        <td><a href="#" data-edit="${esc(p.id)}"><strong>${esc(p.name)}</strong></a><div class="small">${esc(p.category)}</div>${p.active ? `<button type="button" class="link small copy-link" data-link="${esc(p.id)}">🔗 Copy link</button>` : ""}</td>
         <td>${money(p.price)}</td>
         <td><div class="stock-cells">${sizeEntries(p).map(([s, n]) =>
           `<label class="sc ${n == 0 ? "zero" : n <= C.lowStockThreshold ? "low" : ""}"><small>${esc(s)}</small><input type="number" min="0" value="${n}" data-pid="${esc(p.id)}" data-size="${esc(s)}"></label>`).join("")}</div></td>
@@ -132,6 +132,12 @@
     catch (err) { toast(err.message); }
   });
   $("#stockTable").addEventListener("click", e => { const a = e.target.closest("[data-edit]"); if (a) { e.preventDefault(); editProduct(a.dataset.edit); } });
+  // Shareable product link (for TikTok bio, Snapchat, WhatsApp…)
+  $("#stockTable").addEventListener("click", async e => {
+    const b = e.target.closest("[data-link]"); if (!b) return;
+    const url = location.origin + location.pathname.replace(/[^/]*$/, "") + "p/" + encodeURIComponent(b.dataset.link) + "/";
+    try { await navigator.clipboard.writeText(url); toast("Link copied: " + url); } catch { prompt("Copy this link:", url); }
+  });
   $("#addProduct").onclick = () => editProduct(null);
 
   const PRESETS = {
