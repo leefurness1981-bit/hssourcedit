@@ -1,0 +1,43 @@
+# Stops the free Supabase project being paused for inactivity (Supabase pauses free projects
+# after about a week with no activity). Every 3 days this runs a small read-only query against
+# the database and the website's API. It changes nothing.
+#
+# GitHub also switches off scheduled workflows in a repo that's had no commits for 60 days,
+# so this job switches itself (and the product-pages job) back on each time it runs.
+name: Keep Supabase awake
+
+on:
+  schedule:
+    - cron: "17 6 */3 * *"   # 06:17 UTC every 3rd day
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Query the database
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$DB_URL" ]; then echo "::error::Secret SUPABASE_DB_URL is missing"; exit 1; fi
+          psql "$DB_URL" -At -c "select 'products: ' || count(*) from public.products;"
+          psql "$DB_URL" -At -c "select 'orders: ' || count(*) from public.orders;"
+      - name: Call the website's API
+        run: |
+          URL=$(grep -oP 'supabaseUrl:\s*"\K[^"]+' js/config.js)
+          KEY=$(grep -oP 'supabaseAnonKey:\s*"\K[^"]+' js/config.js)
+          code=$(curl -s -o /dev/null -w "%{http_code}" "$URL/rest/v1/products?select=id&limit=1" -H "apikey: $KEY" -H "Authorization: Bearer $KEY")
+          echo "API answered $code"
+          [ "$code" = "200" ] || { echo "::error::Supabase API returned $code"; exit 1; }
+      - name: Keep the scheduled jobs switched on
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for wf in keep-supabase-awake.yml product-pages.yml; do
+            gh api -X PUT "repos/${{ github.repository }}/actions/workflows/$wf/enable" && echo "enabled $wf" || echo "couldn't re-enable $wf"
+          done
