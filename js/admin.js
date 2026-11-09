@@ -3,7 +3,8 @@
   const { sizeEntries, money, esc, imgTag, totalStock } = window.KERB;
   const $ = s => document.querySelector(s);
   const $$ = s => [...document.querySelectorAll(s)];
-  let products = [], orders = [], customers = [], campaigns = [], offers = [];
+  let products = [], orders = [], customers = [], campaigns = [], offers = [], messages = [];
+  const msgsForOrder = id => messages.filter(m => m.order_id === id);
 
   let tt;
   function toast(m) { const t = $("#toast"); t.textContent = m; t.classList.add("show"); clearTimeout(tt); tt = setTimeout(() => t.classList.remove("show"), 2800); }
@@ -27,7 +28,7 @@
     $("#demoBanner").hidden = Store.live;
     $("#demoTools").hidden = Store.live;
     $("#modeInfo").innerHTML = Store.live
-      ? `<span class="pill paid">Live</span> Connected to Supabase as <strong>${esc(session.user.email)}</strong>. Payments via Stripe Checkout; emails via Resend.`
+      ? `<span class="pill paid">Live</span> Connected to Supabase as <strong>${esc(session.user.email)}</strong>. Payments via Stripe Checkout; emails via Brevo.`
       : `<span class="pill">Demo</span> Running on browser storage. Checkout is simulated and emails are not sent. See README.md to go live.`;
     await loadAll();
   }
@@ -44,6 +45,7 @@
         Store.getProducts({ includeInactive: true }), Store.getOrders(), Store.getCustomers(), Store.getCampaigns()
       ]);
     } catch (err) { toast("Load failed: " + err.message); return; }
+    try { messages = await Store.getAllMessages(); } catch (err) { messages = []; console.warn("Messages unavailable:", err.message); }
     renderDashboard(); renderStock(); renderOrders(); renderCustomers(); renderEmail();
     loadOffers();
   }
@@ -276,7 +278,7 @@
     open("#msgEditor");
     const ta = f.elements.message; const pos = ta.value.indexOf("\n\n") + 2; ta.focus(); ta.setSelectionRange(pos, pos);
     try {
-      const msgs = await Store.getMessages(o.id);
+      const msgs = msgsForOrder(o.id).slice().sort((a, b) => a.created_at.localeCompare(b.created_at));
       $("#msgHistory").innerHTML = msgs.length ? `<h3>Previous messages</h3>` + msgs.map(m => `<div class="msg ${m.direction === "in" ? "in" : "out"}">
         <div class="small">${m.direction === "in" ? "From customer" : "Sent"} · ${fmtDate(m.created_at)} · ${esc(m.subject)}</div><div class="msg-body">${esc(m.body)}</div></div>`).join("") : "";
     } catch (err) { /* history is a nice-to-have; sending still works */ }
@@ -288,7 +290,8 @@
     try {
       const res = await Store.sendMessage(msgOrder.id, f.elements.subject.value.trim(), f.elements.message.value.trim());
       toast(res.demo ? "Saved (demo — email not sent)" : `Message sent to ${msgOrder.customer_email} ✓`);
-      close("#msgEditor");
+      if (res.message) messages.unshift(res.message); else { try { messages = await Store.getAllMessages(); } catch (_) {} }
+      close("#msgEditor"); renderOrders();
     } catch (err) { toast(err.message); }
     finally { btn.disabled = false; btn.textContent = "Send message"; }
   };
@@ -298,7 +301,7 @@
     $("#ordersTable").innerHTML = `<thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th>Tracking</th></tr></thead><tbody>` +
       (list.length ? list.map(o => `<tr data-row="${esc(o.id)}">
         <td><strong>${esc(o.id)}</strong>${o.offer_token ? `<div><span class="pill on">Friends & family</span></div>` : ""}</td><td>${fmtDate(o.created_at)}</td>
-        <td>${esc(o.customer_name || "")}<div class="small">${esc(o.customer_email)}</div>${o.shipping_address ? `<div class="small">${esc(o.shipping_address)}</div>` : ""}${o.customer_email ? `<button type="button" class="email-cust" data-msg="${esc(o.id)}">✉ Message customer</button>` : ""}</td>
+        <td>${esc(o.customer_name || "")}<div class="small">${esc(o.customer_email)}</div>${o.shipping_address ? `<div class="small">${esc(o.shipping_address)}</div>` : ""}${o.customer_email ? `<button type="button" class="email-cust" data-msg="${esc(o.id)}">✉ Message customer</button>` : ""}${msgsForOrder(o.id).length ? `<button type="button" class="msg-count" data-msg="${esc(o.id)}">💬 ${msgsForOrder(o.id).length} message${msgsForOrder(o.id).length === 1 ? "" : "s"} · view</button>` : ""}</td>
         <td>${(o.items || []).map(i => `${i.qty}× ${esc(i.name)} <span class="small">(${esc(i.size)})</span>${i.backorder ? ` <span class="pill wait">pre-order · ${esc(i.lead_time || "")}</span>` : ""}`).join("<br>")}</td>
         <td>${money(o.total)}</td>
         <td><select data-oid="${esc(o.id)}">${STATUSES.map(s => `<option ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}</select></td>
@@ -372,6 +375,10 @@
     f.elements.marketing_opt_in.checked = !!c.marketing_opt_in;
     const theirs = orders.filter(o => o.customer_email === c.email);
     $("#custOrders").innerHTML = theirs.length ? theirs.map(o => `<button type="button" class="mini mini-link" data-goto="${esc(o.id)}"><span>${esc(o.id)} · ${fmtDate(o.created_at)}</span><span>${money(o.total)} <span class="pill ${o.status}">${o.status}</span> ›</span></button>`).join("") : "No orders yet.";
+    const theirMsgs = messages.filter(m => m.customer_email === (c.email || "").toLowerCase());
+    $("#custMsgs").innerHTML = theirMsgs.length ? theirMsgs.map(m => `<div class="msg ${m.direction === "in" ? "in" : "out"}">
+        <div class="small">${m.direction === "in" ? "From customer" : "Sent"} · ${fmtDate(m.created_at)}${m.order_id ? ` · <button type="button" class="link small" data-goto="${esc(m.order_id)}">${esc(m.order_id)}</button>` : ""}</div>
+        <div><strong>${esc(m.subject)}</strong></div><div class="msg-body">${esc(m.body)}</div></div>`).join("") : "No messages yet.";
     $("#deleteCustomer").hidden = !c.email;
     open("#custEditor");
   }
@@ -388,6 +395,7 @@
   $("#recentOrders").addEventListener("click", e => { const b = e.target.closest("[data-goto]"); if (b) goToOrder(b.dataset.goto); });
   $("#lowStock").addEventListener("click", e => { const b = e.target.closest("[data-goprod]"); if (b) { goTab("stock"); editProduct(b.dataset.goprod); } });
   $("#custOrders").addEventListener("click", e => { const b = e.target.closest("[data-goto]"); if (b) goToOrder(b.dataset.goto); });
+  $("#custMsgs").addEventListener("click", e => { const b = e.target.closest("[data-goto]"); if (b) goToOrder(b.dataset.goto); });
   $("#custForm").onsubmit = async e => {
     e.preventDefault(); const f = e.target;
     const existing = customers.find(x => x.email === f.dataset.email) || {};

@@ -117,3 +117,7 @@ button.link { text-decoration: underline; color: var(--muted); }
 #msgHistory .msg.in { border-color: #555; background: #1a1a1a; }
 #msgHistory .msg-body { white-space: pre-wrap; font-size: .9rem; margin-top: .3rem; }
 #msgTo { margin-top: -.4rem; }
+.msg-count { display: block; margin-top: .45rem; background: none; border: 0; padding: 0; color: #cfcfcf; font: inherit; font-size: .8rem; text-decoration: underline; cursor: pointer; text-align: left; }
+#msgHistory .msg, .msg-list .msg { border: 1px solid var(--line); border-radius: 6px; padding: .6rem .75rem; margin-bottom: .5rem; }
+.msg-list .msg.in { border-color: #555; background: #1a1a1a; }
+.msg-list .msg-body { white-space: pre-wrap; margin-top: .3rem; color: #d6d6d6; }
