@@ -22,12 +22,12 @@ Deno.serve(async (req) => {
     // Only send the welcome email once per address
     if (!existing?.welcome_sent_at) {
       // Their own one-use code. There's no shared fallback code: if Stripe can't make one right now,
-      // the welcome email goes without it and Admin > Email > Welcome codes can send it later.
+      // the welcome email goes without it and asks them to reply for their code.
       let code = "", expiresAt: Date | null = null;
       try {
         ({ code, expiresAt } = await createWelcomeCode(email));
         await db.from("customers").update({ welcome_code: code, welcome_code_expires_at: expiresAt.toISOString() }).eq("email", email);
-      } catch (e) { console.error("welcome code failed — send it later from Admin > Email", e); }
+      } catch (e) { console.error("welcome code failed — customer asked to reply for their code", e); }
       const { subject, html } = welcomeEmail({ name: cleanName, code, percent: PERCENT, expiresAt, shopUrl: SITE_URL, logoUrl: LOGO_URL });
       try {
         await sendMarketing(email, cleanName, subject, html, ["welcome"]);

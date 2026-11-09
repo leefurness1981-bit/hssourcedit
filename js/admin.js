@@ -63,7 +63,6 @@
     $$("#tabs button").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
     $$("[data-panel]").forEach(p => (p.hidden = p.dataset.panel !== tab));
     window.scrollTo(0, 0);
-    if (tab === "email") refreshWelcomeCodes();
   }
   function goTab(tab) {
     if (tab === curTab) return;
@@ -275,25 +274,6 @@
     const num = url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(o.tracking_number)}</a>` : esc(o.tracking_number);
     return `<div class="small">${esc(o.carrier || "")}</div>${num} <button class="small link" data-ship="${esc(o.id)}">edit</button>`;
   }
-  // Welcome codes: offer to send personal codes to people who subscribed before codes were personal
-  async function refreshWelcomeCodes() {
-    if (!Store.live) { $("#wcStatus").textContent = "Works once the shop is live."; return; }
-    try {
-      const { pending } = await Store.welcomeCodes("count");
-      $("#wcStatus").textContent = pending ? `${pending} subscriber${pending === 1 ? "" : "s"} (who haven't ordered yet) don't have a personal code.` : "Everyone on the list has a personal code (or has already ordered).";
-      $("#wcSend").hidden = !pending;
-    } catch (err) { $("#wcStatus").textContent = "Couldn't check welcome codes: " + err.message; }
-  }
-  $("#wcSend").onclick = async () => {
-    if (!confirm("Email a personal one-use 5% code to every subscriber who hasn't got one yet and hasn't ordered?")) return;
-    const b = $("#wcSend"); b.disabled = true; b.textContent = "Sending…";
-    try {
-      const r = await Store.welcomeCodes("send");
-      toast(`Sent ${r.sent} code${r.sent === 1 ? "" : "s"}${r.failed ? ` · ${r.failed} failed` : ""}${r.limitHit ? " · daily email limit reached, try again tomorrow" : r.remaining ? ` · ${r.remaining} left — press again` : ""}`);
-    } catch (err) { toast(err.message); }
-    finally { b.disabled = false; b.textContent = "Send personal codes to existing subscribers"; refreshWelcomeCodes(); }
-  };
-
   // "Message customer": write and send an email from inside admin; past messages show on the order
   let msgOrder = null;
   async function openMessage(id) {

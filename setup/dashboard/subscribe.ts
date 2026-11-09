@@ -210,7 +210,7 @@ function welcomeEmail({ name, code, percent = 5, expiresAt = null, existing = fa
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 6px"><tr>
       <td align="center" style="border:2px dashed #ffffff;border-radius:4px;padding:18px;font-family:${C.font};font-size:26px;font-weight:900;letter-spacing:3px;color:#ffffff">${esc(code)}</td></tr></table>
     ${p(`Enter it at checkout. It's just for you and works once${by ? ` — use it by ${esc(by)}` : ""}.`, `font-size:13px;color:${C.muted};text-align:center`)}`
-    : p(`Your personal code for <strong style="color:#fff">${esc(percent)}% off your first order</strong> is on its way in a separate email.`)}
+    : p(`Your code for <strong style="color:#fff">${esc(percent)}% off your first order</strong> didn't come through this time. Just reply to this email and we'll send it straight over.`)}
     ${button(shopUrl, "Shop now")}
     ${p("Got a question or looking for something specific? Just reply to this email — it comes straight to us.")}`;
   return {
@@ -404,12 +404,12 @@ Deno.serve(async (req) => {
     // Only send the welcome email once per address
     if (!existing?.welcome_sent_at) {
       // Their own one-use code. There's no shared fallback code: if Stripe can't make one right now,
-      // the welcome email goes without it and Admin > Email > Welcome codes can send it later.
+      // the welcome email goes without it and asks them to reply for their code.
       let code = "", expiresAt: Date | null = null;
       try {
         ({ code, expiresAt } = await createWelcomeCode(email));
         await db.from("customers").update({ welcome_code: code, welcome_code_expires_at: expiresAt.toISOString() }).eq("email", email);
-      } catch (e) { console.error("welcome code failed — send it later from Admin > Email", e); }
+      } catch (e) { console.error("welcome code failed — customer asked to reply for their code", e); }
       const { subject, html } = welcomeEmail({ name: cleanName, code, percent: PERCENT, expiresAt, shopUrl: SITE_URL, logoUrl: LOGO_URL });
       try {
         await sendMarketing(email, cleanName, subject, html, ["welcome"]);
