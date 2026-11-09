@@ -247,7 +247,7 @@
       (list.length ? list.map(o => `<tr>
         <td><strong>${esc(o.id)}</strong>${o.offer_token ? `<div><span class="pill on">Friends & family</span></div>` : ""}</td><td>${fmtDate(o.created_at)}</td>
         <td>${esc(o.customer_name || "")}<div class="small">${esc(o.customer_email)}</div>${o.shipping_address ? `<div class="small">${esc(o.shipping_address)}</div>` : ""}</td>
-        <td>${(o.items || []).map(i => `${i.qty}× ${esc(i.name)} <span class="small">(${esc(i.size)})</span>${i.backorder ? ` <span class="pill packed">pre-order · ${esc(i.lead_time || "")}</span>` : ""}`).join("<br>")}</td>
+        <td>${(o.items || []).map(i => `${i.qty}× ${esc(i.name)} <span class="small">(${esc(i.size)})</span>${i.backorder ? ` <span class="pill wait">pre-order · ${esc(i.lead_time || "")}</span>` : ""}`).join("<br>")}</td>
         <td>${money(o.total)}</td>
         <td><select data-oid="${esc(o.id)}">${STATUSES.map(s => `<option ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}</select></td>
         <td>${trackCell(o)}</td></tr>`).join("")

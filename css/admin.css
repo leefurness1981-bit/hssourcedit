@@ -101,3 +101,5 @@ button.link { text-decoration: underline; color: var(--muted); }
 .offer-box { border-top: 1px solid var(--line); padding-top: 1.2rem; margin-top: .4rem; display: flex; flex-direction: column; gap: .8rem; }
 .offer-box .row-btns { justify-content: flex-start; }
 .copy-link { font-size: .75rem; text-decoration: underline; color: var(--muted); margin-left: .4rem; }
+/* Pre-order label on order lines: a rounded tag that wraps neatly on narrow screens (no circles) */
+.pill.wait { display: table; margin: .3rem 0 .5rem; border-radius: 6px; background: #bdbdbd; color: #000; line-height: 1.35; white-space: normal; max-width: 100%; }
