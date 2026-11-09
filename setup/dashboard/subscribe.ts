@@ -1,6 +1,7 @@
 // @ts-nocheck
 // subscribe — single-file version for the Supabase dashboard editor (generated from supabase/functions/subscribe).
 import { createClient } from "npm:@supabase/supabase-js@2";
+import Stripe from "npm:stripe@16";
 
 // ---------- shared: email helpers ----------
 // Email sending + shared helpers for all functions.
@@ -195,19 +196,24 @@ function layout({ body, shopUrl, logoUrl, preheader = "", footer = "" }) {
 }
 
 /** Welcome email sent when someone joins the list. */
-function welcomeEmail({ name, code, percent = 10, shopUrl, logoUrl }) {
+/** @param {{ name?: string, code: string, percent?: number, expiresAt?: Date | string | null, existing?: boolean, shopUrl: string, logoUrl: string }} o */
+function welcomeEmail({ name, code, percent = 5, expiresAt = null, existing = false, shopUrl, logoUrl }) {
   const hi = first(name) ? `Welcome, ${esc(first(name))}.` : "Welcome in.";
+  const by = expiresAt ? new Date(expiresAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "";
+  const intro = existing
+    ? `${first(name) ? `Hi ${esc(first(name))} — t` : "T"}hanks for being on the list. Here's your own code for <strong style="color:#fff">${esc(percent)}% off your first order</strong>:`
+    : `As promised, here's <strong style="color:#fff">${esc(percent)}% off your first order</strong>:`;
   const body = `
-    ${heading("You're on the list.")}
-    ${p(`${hi} You'll be first to hear about new drops, restocks and members-only deals — before anyone else.`)}
-    ${p(`As promised, here's <strong style="color:#fff">${esc(percent)}% off your first order</strong>:`)}
+    ${heading(existing ? "Your personal code." : "You're on the list.")}
+    ${existing ? "" : p(`${hi} You'll be first to hear about new drops, restocks and members-only deals — before anyone else.`)}
+    ${p(intro)}
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 6px"><tr>
-      <td align="center" style="border:2px dashed #ffffff;border-radius:4px;padding:18px;font-family:${C.font};font-size:28px;font-weight:900;letter-spacing:4px;color:#ffffff">${esc(code)}</td></tr></table>
-    ${p("Enter it at checkout. One use per customer.", `font-size:13px;color:${C.muted};text-align:center`)}
+      <td align="center" style="border:2px dashed #ffffff;border-radius:4px;padding:18px;font-family:${C.font};font-size:26px;font-weight:900;letter-spacing:3px;color:#ffffff">${esc(code)}</td></tr></table>
+    ${p(`Enter it at checkout. It's just for you and works once${by ? ` — use it by ${esc(by)}` : ""}.`, `font-size:13px;color:${C.muted};text-align:center`)}
     ${button(shopUrl, "Shop now")}
     ${p("Got a question or looking for something specific? Just reply to this email — it comes straight to us.")}`;
   return {
-    subject: `Welcome to HS Sourced It — here's ${percent}% off`,
+    subject: existing ? `Your ${percent}% off code for HS Sourced It` : `Welcome to HS Sourced It — here's ${percent}% off`,
     html: layout({ body, shopUrl, logoUrl, preheader: `Your ${percent}% off code is inside.`,
       footer: `You're receiving this because you signed up at HS Sourced It. {{unsubscribe}}` }),
   };
@@ -319,12 +325,58 @@ function customerMessageEmail({ name, message, orderId, items, shopUrl, logoUrl 
   return layout({ body, shopUrl, logoUrl, preheader: String(message || "").slice(0, 90) });
 }
 
+// ---------- shared: welcome codes ----------
+// One-use welcome discount codes: each subscriber gets their own Stripe promotion code
+// (e.g. WELCOME-7KQ2MX) that works once and expires after WELCOME_CODE_DAYS (default 30).
+// The 5% coupon behind them is created automatically in Stripe if it doesn't exist yet.
+
+const WELCOME_PERCENT = Number(Deno.env.get("WELCOME_PERCENT") ?? "5");
+const WELCOME_CODE_DAYS = Number(Deno.env.get("WELCOME_CODE_DAYS") ?? "30");
+const COUPON_ID = `hs-welcome-${WELCOME_PERCENT}`;
+const ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O, 1/I/L — easy to type
+
+let stripe: Stripe | null = null;
+const client = () => (stripe ??= new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { apiVersion: "2024-06-20" }));
+
+async function ensureCoupon() {
+  try { await client().coupons.retrieve(COUPON_ID); }
+  catch (e) {
+    if ((e as { statusCode?: number }).statusCode !== 404) throw e;
+    await client().coupons.create({ id: COUPON_ID, percent_off: WELCOME_PERCENT, duration: "once", name: `Welcome ${WELCOME_PERCENT}% off` });
+  }
+}
+
+function randomCode() {
+  const bytes = crypto.getRandomValues(new Uint8Array(6));
+  return "WELCOME-" + Array.from(bytes, (b) => ALPHABET[b % ALPHABET.length]).join("");
+}
+
+/** Creates a one-use, expiring code for this email. Returns the code and its expiry date. */
+async function createWelcomeCode(email: string): Promise<{ code: string; expiresAt: Date }> {
+  await ensureCoupon();
+  const expiresAt = new Date(Date.now() + WELCOME_CODE_DAYS * 86400000);
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const code = randomCode();
+    try {
+      await client().promotionCodes.create({
+        coupon: COUPON_ID, code, max_redemptions: 1,
+        expires_at: Math.floor(expiresAt.getTime() / 1000),
+        metadata: { email, kind: "welcome" },
+      });
+      return { code, expiresAt };
+    } catch (e) {
+      if (attempt === 3 || !/already exists|code/i.test((e as Error).message)) throw e;
+    }
+  }
+  throw new Error("Couldn't create a welcome code");
+}
+
 // ---------- function ----------
 // Newsletter signup from the shop: saves the customer, syncs to Brevo,
 // and sends the welcome email with the discount code (first signup only).
 
-const CODE = Deno.env.get("WELCOME_CODE") ?? "WELCOME10";
-const PERCENT = Number(Deno.env.get("WELCOME_PERCENT") ?? "10");
+// Fallback shared code, only used if Stripe can't create a personal code at that moment
+const FALLBACK_CODE = Deno.env.get("WELCOME_CODE") ?? "WELCOME5";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -342,7 +394,13 @@ Deno.serve(async (req) => {
 
     // Only send the welcome email once per address
     if (!existing?.welcome_sent_at) {
-      const { subject, html } = welcomeEmail({ name: cleanName, code: CODE, percent: PERCENT, shopUrl: SITE_URL, logoUrl: LOGO_URL });
+      // Their own one-use code (falls back to the shared code if Stripe is unavailable)
+      let code = FALLBACK_CODE, expiresAt: Date | null = null;
+      try {
+        ({ code, expiresAt } = await createWelcomeCode(email));
+        await db.from("customers").update({ welcome_code: code, welcome_code_expires_at: expiresAt.toISOString() }).eq("email", email);
+      } catch (e) { console.error("welcome code failed, using fallback", e); }
+      const { subject, html } = welcomeEmail({ name: cleanName, code, percent: PERCENT, expiresAt, shopUrl: SITE_URL, logoUrl: LOGO_URL });
       try {
         await sendMarketing(email, cleanName, subject, html, ["welcome"]);
         await db.from("customers").update({ welcome_sent_at: new Date().toISOString() }).eq("email", email);

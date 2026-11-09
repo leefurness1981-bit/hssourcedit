@@ -63,6 +63,7 @@
     $$("#tabs button").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
     $$("[data-panel]").forEach(p => (p.hidden = p.dataset.panel !== tab));
     window.scrollTo(0, 0);
+    if (tab === "email") refreshWelcomeCodes();
   }
   function goTab(tab) {
     if (tab === curTab) return;
@@ -273,6 +274,25 @@
     const num = url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(o.tracking_number)}</a>` : esc(o.tracking_number);
     return `<div class="small">${esc(o.carrier || "")}</div>${num} <button class="small link" data-ship="${esc(o.id)}">edit</button>`;
   }
+  // Welcome codes: offer to send personal codes to people who subscribed before codes were personal
+  async function refreshWelcomeCodes() {
+    if (!Store.live) { $("#wcStatus").textContent = "Works once the shop is live."; return; }
+    try {
+      const { pending } = await Store.welcomeCodes("count");
+      $("#wcStatus").textContent = pending ? `${pending} subscriber${pending === 1 ? "" : "s"} (who haven't ordered yet) don't have a personal code.` : "Everyone on the list has a personal code (or has already ordered).";
+      $("#wcSend").hidden = !pending;
+    } catch (err) { $("#wcStatus").textContent = "Couldn't check welcome codes: " + err.message; }
+  }
+  $("#wcSend").onclick = async () => {
+    if (!confirm("Email a personal one-use 5% code to every subscriber who hasn't got one yet and hasn't ordered?")) return;
+    const b = $("#wcSend"); b.disabled = true; b.textContent = "Sending…";
+    try {
+      const r = await Store.welcomeCodes("send");
+      toast(`Sent ${r.sent} code${r.sent === 1 ? "" : "s"}${r.failed ? ` · ${r.failed} failed` : ""}${r.limitHit ? " · daily email limit reached, try again tomorrow" : r.remaining ? ` · ${r.remaining} left — press again` : ""}`);
+    } catch (err) { toast(err.message); }
+    finally { b.disabled = false; b.textContent = "Send personal codes to existing subscribers"; refreshWelcomeCodes(); }
+  };
+
   // "Message customer": write and send an email from inside admin; past messages show on the order
   let msgOrder = null;
   async function openMessage(id) {
@@ -388,6 +408,8 @@
     f.elements.marketing_opt_in.checked = !!c.marketing_opt_in;
     const theirs = orders.filter(o => o.customer_email === c.email);
     $("#custOrders").innerHTML = theirs.length ? theirs.map(o => `<button type="button" class="mini mini-link" data-goto="${esc(o.id)}"><span>${esc(o.id)} · ${fmtDate(o.created_at)}</span><span>${money(o.total)} <span class="pill ${o.status}">${o.status}</span> ›</span></button>`).join("") : "No orders yet.";
+    $("#custCode").innerHTML = c.welcome_code
+      ? `Welcome code: <strong>${esc(c.welcome_code)}</strong>${c.welcome_code_expires_at ? ` · ${new Date(c.welcome_code_expires_at) < new Date() ? "expired" : "use by"} ${fmtDate(c.welcome_code_expires_at)}` : ""} <span class="small">(Stripe shows whether it's been used)</span>` : "";
     $("#deleteCustomer").hidden = !c.email;
     open("#custEditor");
   }
@@ -436,7 +458,7 @@
   function showAutoPreview(kind, data = {}) {
     const T = window.EMAIL_T; if (!T) return toast("Email designs still loading — try again");
     const base = { shopUrl: shopUrl(), logoUrl: logoUrl() };
-    const e = kind === "welcome" ? T.welcomeEmail({ ...base, name: "Jayden", code: C.welcomeCode, percent: C.welcomePercent, ...data })
+    const e = kind === "welcome" ? T.welcomeEmail({ ...base, name: "Jayden", code: "WELCOME-7KQ2MX", percent: C.welcomePercent, expiresAt: new Date(Date.now() + 30 * 86400000), ...data })
       : kind === "order" ? T.orderConfirmedEmail({ ...base, orderId: "ORD-7F3K2Q", name: "Jayden Reid", items: SAMPLE_ITEMS, total: 220, address: "12 High Street, Leeds, LS1 4AB", ...data })
       : T.orderShippedEmail({ ...base, orderId: "ORD-7F3K2Q", name: "Jayden Reid", items: SAMPLE_ITEMS, carrier: "Royal Mail", trackingNumber: "AB123456789GB", ...data });
     $("#preview").srcdoc = fakeUnsub(e.html);

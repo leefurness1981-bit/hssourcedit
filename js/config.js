@@ -13,7 +13,7 @@ window.SHOP_CONFIG = {
   shippingCost: 4.95,          // default delivery cost for products that don't have their own (set per product in admin)
   freeShippingMinItems: 2,     // free delivery when the bag has this many items or more (keep in step with FREE_SHIPPING_MIN_ITEMS on the server)
   lowStockThreshold: 3,
-  welcomeCode: "WELCOME5",   // must match the promotion code you create in Stripe (and WELCOME_CODE on the server)
+  welcomeCode: "WELCOME5",   // backup shared code; new subscribers get their own one-use code (created automatically)
   welcomePercent: 5,
   contactEmail: "hello@hssourcedit.com",
   contactUrl: "https://snapchat.com/t/XMwvsQmV", // footer "Contact" link (Snapchat). Set to "" to use the email instead

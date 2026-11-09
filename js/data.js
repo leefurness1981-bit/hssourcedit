@@ -320,6 +320,11 @@
       ensureSeed();
       return ls.get("campaigns", []);
     },
+    // Personal welcome codes for subscribers who joined before codes were personal
+    async welcomeCodes(action = "count") {
+      if (LIVE) return fn("welcome-codes", { action });
+      return { pending: 0, demo: true };
+    },
     async sendCampaign({ subject, inner, html, segment }) {
       if (LIVE) return fn("send-email", { subject, inner, segment });
       const customers = ls.get("customers", []).filter(c => c.marketing_opt_in && (segment === "all" || (c.tags || []).includes(segment)));

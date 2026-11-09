@@ -201,3 +201,5 @@ drop policy if exists "admin messages" on customer_messages;
 create policy "admin messages" on customer_messages for all using (is_admin()) with check (is_admin());
 create index if not exists customer_messages_order_idx on customer_messages (order_id, created_at desc);
 create index if not exists customer_messages_email_idx on customer_messages (customer_email, created_at desc);
+alter table customers add column if not exists welcome_code text;
+alter table customers add column if not exists welcome_code_expires_at timestamptz;
