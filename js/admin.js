@@ -314,7 +314,7 @@
       (list.length ? list.map(o => `<tr data-row="${esc(o.id)}" class="oc">
         <td class="oc-head"><strong>${esc(o.id)}</strong><span class="oc-date">${fmtDate(o.created_at)}</span><span class="oc-total">${money(o.total)}</span>${o.offer_token ? `<div><span class="pill on">Friends & family</span></div>` : ""}</td><td class="oc-hide">${fmtDate(o.created_at)}</td>
         <td class="oc-cust">${esc(o.customer_name || "")}<div class="small">${esc(o.customer_email)}</div>${o.shipping_address ? `<div class="small">${esc(o.shipping_address)}</div>` : ""}${o.customer_email ? `<button type="button" class="email-cust" data-msg="${esc(o.id)}">✉ Message customer</button>` : ""}${msgsForOrder(o.id).length ? `<button type="button" class="msg-count" data-msg="${esc(o.id)}">💬 ${msgsForOrder(o.id).length} message${msgsForOrder(o.id).length === 1 ? "" : "s"} · view</button>` : ""}</td>
-        <td class="oc-items">${(o.items || []).map(i => `<div class="oc-item">${i.qty}× ${esc(i.name)} <span class="small">(${esc(i.size)})</span>${i.backorder ? ` <span class="pill wait">pre-order · ${esc(i.lead_time || "")}</span>` : ""}</div>`).join("")}</td>
+        <td class="oc-items">${(o.items || []).map(i => `<div class="oc-item">${i.qty}× ${esc(i.name)} <span class="small">(${esc(i.size)})</span>${i.backorder ? ` <span class="pill wait">${esc(i.lead_time || "Out of stock")}</span>` : ""}</div>`).join("")}</td>
         <td class="oc-hide">${money(o.total)}</td>
         <td class="oc-status"><select data-oid="${esc(o.id)}">${STATUSES.map(s => `<option ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}</select></td>
         <td class="oc-track">${trackCell(o)}</td></tr>`).join("")
