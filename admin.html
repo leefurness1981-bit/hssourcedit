@@ -7,8 +7,8 @@
   <title>HS Sourced It — Admin</title>
   <link rel="icon" href="images/favicon.png">
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Source+Serif+4:opsz,wght@8..60,900&family=Archivo:wght@400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=202611091645">
-  <link rel="stylesheet" href="css/admin.css?v=202611091645">
+  <link rel="stylesheet" href="css/style.css?v=202611091925">
+  <link rel="stylesheet" href="css/admin.css?v=202611091925">
 </head>
 <body class="admin">
   <!-- Login -->
@@ -101,7 +101,7 @@
               </select></label>
             <label>Subject <input name="subject" required placeholder="🔥 Drop 05 lands Friday"></label>
             <label>Message (HTML allowed) <textarea name="html" rows="10" required></textarea></label>
-            <div class="row-btns"><button type="button" class="btn btn-ghost" id="previewBtn">Preview</button><button class="btn btn-accent">Send campaign</button></div>
+            <div class="row-btns"><button class="btn btn-accent">Send campaign</button></div>
             <p class="small">Only customers who opted in to marketing are included. An unsubscribe link is added automatically.</p>
           </form>
           <div class="panel">
@@ -112,7 +112,7 @@
               <button type="button" class="chip" data-auto="order">🧾 Order confirmed</button>
               <button type="button" class="chip" data-auto="shipped">📦 Order shipped</button>
             </div>
-            <h3 style="margin-top:.6rem">Preview</h3>
+            <h3 style="margin-top:.6rem">Preview <span class="small">(updates as you type)</span></h3>
             <p class="small" id="previewSubject"></p>
             <iframe id="preview" title="Email preview"></iframe>
             <h3 style="margin-top:1.5rem">Sent campaigns</h3><div id="campaignList"></div>
@@ -254,12 +254,12 @@
 
   <div class="toast" id="toast"></div>
 
-  <script src="js/config.js?v=202611091645"></script>
+  <script src="js/config.js?v=202611091925"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/data.js?v=202611091645"></script>
-  <script src="js/markdown.js?v=202611091645"></script>
-  <script src="js/default-pages.js?v=202611091645"></script>
-  <script src="js/admin.js?v=202611091645"></script>
+  <script src="js/data.js?v=202611091925"></script>
+  <script src="js/markdown.js?v=202611091925"></script>
+  <script src="js/default-pages.js?v=202611091925"></script>
+  <script src="js/admin.js?v=202611091925"></script>
   <script type="module">
     import * as T from "./supabase/functions/_shared/templates.js";
     window.EMAIL_T = T;

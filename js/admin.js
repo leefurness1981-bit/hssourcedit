@@ -494,10 +494,21 @@
     $("#campaignList").innerHTML = campaigns.length ? campaigns.map(c => `<div class="mini"><span>${esc(c.subject)}<div class="small">${fmtDate(c.created_at)} · ${esc(c.segment)}</div></span><span>${c.recipients} sent ${c.status ? `<span class="pill">${esc(c.status)}</span>` : ""}</span></div>`).join("") : `<p class="small">No campaigns yet.</p>`;
   }
   $("#segment").onchange = segCount;
-  $("#template").onchange = e => { const t = TEMPLATES[e.target.value]; if (!t) return; const f = $("#campaignForm"); f.elements.subject.value = t.subject; f.elements.html.value = t.html; preview(); };
+  // Picking a template fills in its subject and message; "Blank" clears both. Asks first if you've typed your own.
+  let lastTemplate = "";
+  const isUntouched = f => !f.elements.html.value.trim() ||
+    Object.values(TEMPLATES).some(t => t.html === f.elements.html.value && t.subject === f.elements.subject.value);
+  $("#template").onchange = e => {
+    const f = $("#campaignForm"), t = TEMPLATES[e.target.value];
+    if (!isUntouched(f) && !confirm("Replace the subject and message you've written?")) { e.target.value = lastTemplate; return; }
+    f.elements.subject.value = t ? t.subject : "";
+    f.elements.html.value = t ? t.html : "";
+    lastTemplate = e.target.value; preview();
+  };
+  // The preview updates as you type
   function preview() { $("#preview").srcdoc = fakeUnsub(wrapEmail($("#campaignForm").elements.html.value)); $("#previewSubject").textContent = "Subject: " + ($("#campaignForm").elements.subject.value || "—"); }
-  $("#previewBtn").onclick = preview;
   $("#campaignForm").elements.html.oninput = preview;
+  $("#campaignForm").elements.subject.oninput = preview;
   $("#campaignForm").onsubmit = async e => {
     e.preventDefault(); const f = e.target;
     const segment = $("#segment").value;
@@ -511,7 +522,7 @@
         navigator.clipboard?.writeText(res.emails.join(", ")).catch(() => {});
       } else if (res.limitHit) toast(`Sent ${res.sent} of ${res.total} — Brevo's daily limit was reached.`);
       else toast(`Sent to ${res.sent} subscribers${res.failed ? ` (${res.failed} failed)` : ""}`);
-      f.reset(); preview(); campaigns = await Store.getCampaigns(); renderEmail();
+      f.reset(); lastTemplate = ""; preview(); campaigns = await Store.getCampaigns(); renderEmail();
     } catch (err) { toast(err.message); }
   };
 
