@@ -120,7 +120,7 @@
           `<label class="sc ${n == 0 ? "zero" : n <= C.lowStockThreshold ? "low" : ""}"><small>${esc(s)}</small><input type="number" min="0" value="${n}" data-pid="${esc(p.id)}" data-size="${esc(s)}"></label>`).join("")}</div></td>
         <td class="pc-total"><strong>${totalStock(p)}</strong><span class="pc-label"> in stock</span></td>
         <td class="pc-status">${p.active ? '<span class="pill on">Live</span>' : '<span class="pill">Hidden</span>'}
-          <div class="small" style="margin-top:.3rem">${p.allow_backorder !== false ? "Pre-order: " + esc(p.lead_time || "5–8 business days") : "No pre-orders"}</div>
+          <div class="small" style="margin-top:.3rem">${p.allow_backorder !== false ? "Wait time: " + esc(p.lead_time || "5–8 business days") : "No orders when out of stock"}</div>
           <div class="small">Delivery: ${money(p.shipping_cost ?? C.shippingCost)}</div></td></tr>`).join("") + "</tbody>";
   }
   $("#stockSearch").oninput = renderStock;
