@@ -65,8 +65,7 @@
         <p class="small">Delivery ${shipCostOf(p) > 0 ? money(shipCostOf(p)) : "free"} · free when you order ${FREE_N}+ items</p>
         <p class="pm-desc">${esc(p.description)}</p>
         <div><p class="small" style="margin-bottom:.5rem">SELECT SIZE</p>
-          <div class="sizes">${sizes.map(([s, n]) => `<button class="size ${n > 0 ? "" : "pre"}" data-size="${esc(s)}" ${n > 0 || canPreorder(p) ? "" : "disabled"} title="${n > 0 ? "In stock" : canPreorder(p) ? "Pre-order: ships in " + esc(leadTime(p)) : "Sold out"}">${esc(s)}</button>`).join("")}</div>
-          ${canPreorder(p) && sizes.some(([, n]) => n <= 0) ? `<p class="small pre-key">Dashed sizes are out of stock — order now, ships in ${esc(leadTime(p))}.</p>` : ""}</div>
+          <div class="sizes">${sizes.map(([s, n]) => `<button class="size ${n > 0 ? "" : "pre"}" data-size="${esc(s)}" ${n > 0 || canPreorder(p) ? "" : "disabled"} title="${n > 0 ? "In stock" : canPreorder(p) ? "Ships in " + esc(leadTime(p)) : "Sold out"}">${esc(s)}</button>`).join("")}</div></div>
         <div class="stock-note" id="stockNote"></div>
         <button class="btn btn-accent btn-block" id="addBtn" disabled>Select a size</button>
       </div></div>`;
@@ -74,7 +73,7 @@
       $$("#productBody .size").forEach(x => x.classList.remove("sel"));
       b.classList.add("sel"); selected = b.dataset.size;
       const n = stockOf(p, selected);
-      $("#stockNote").textContent = n <= 0 ? `Out of stock — order now and it ships in ${leadTime(p)}`
+      $("#stockNote").textContent = n <= 0 ? `Ships in ${leadTime(p)}`
         : n <= C.lowStockThreshold ? `Only ${n} left in ${selected}` : "In stock";
       $("#addBtn").disabled = false; $("#addBtn").textContent = "Add to bag — " + money(p.price);
     });
@@ -101,8 +100,7 @@
         <div class="pm-price">${money(o.price)} ${Number(p.price) > o.price ? `<span class="was">${money(p.price)}</span>` : ""}</div>
         <p class="pm-desc">${esc(p.description || "")}</p>
         <div><p class="small" style="margin-bottom:.5rem">SELECT SIZE</p>
-          <div class="sizes">${sizes.map(([s, n]) => `<button class="size ${n > 0 ? "" : "pre"}" data-size="${esc(s)}" ${n > 0 || canPreorder(p) ? "" : "disabled"}>${esc(s)}</button>`).join("")}</div>
-          ${canPreorder(p) && sizes.some(([, n]) => n <= 0) ? `<p class="small pre-key">Dashed sizes are out of stock — order now, ships in ${esc(leadTime(p))}.</p>` : ""}</div>
+          <div class="sizes">${sizes.map(([s, n]) => `<button class="size ${n > 0 ? "" : "pre"}" data-size="${esc(s)}" ${n > 0 || canPreorder(p) ? "" : "disabled"}>${esc(s)}</button>`).join("")}</div></div>
         ${qtyPicker}
         <div class="stock-note" id="stockNote"></div>
         <button class="btn btn-accent btn-block" id="addBtn" disabled>Select a size</button>
@@ -112,7 +110,7 @@
       $$("#productBody .size").forEach(x => x.classList.remove("sel"));
       b.classList.add("sel"); selected = b.dataset.size;
       const n = stockOf(p, selected);
-      $("#stockNote").textContent = n <= 0 ? `Out of stock — order now and it ships in ${leadTime(p)}` : "In stock";
+      $("#stockNote").textContent = n <= 0 ? `Ships in ${leadTime(p)}` : "In stock";
       $("#addBtn").disabled = false; $("#addBtn").textContent = "Buy now — " + money(o.price);
     });
     $("#addBtn").onclick = async () => {
