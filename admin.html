@@ -7,8 +7,8 @@
   <title>HS Sourced It — Admin</title>
   <link rel="icon" href="images/favicon.png">
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Source+Serif+4:opsz,wght@8..60,900&family=Archivo:wght@400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=202611090034">
-  <link rel="stylesheet" href="css/admin.css?v=202611090034">
+  <link rel="stylesheet" href="css/style.css?v=202611090037">
+  <link rel="stylesheet" href="css/admin.css?v=202611090037">
 </head>
 <body class="admin">
   <!-- Login -->
@@ -147,7 +147,7 @@
         <label>Category
           <select name="category"><option>trainers</option><option>tracksuits</option><option>hoodies</option><option>tees</option><option>jackets</option><option>accessories</option></select></label>
         <label>Price (£) <input name="price" type="number" step="0.01" min="0" required></label>
-        <label>Badge <input name="badge" placeholder="New / Sale / Bestseller"></label>
+        <label>Badge <input name="badge" placeholder="e.g. Sale or Bestseller (leave blank for none)"></label>
         <div class="full photo-field">
           <div class="img-preview" id="imgPreview"></div>
           <div class="photo-actions">
@@ -226,10 +226,10 @@
 
   <div class="toast" id="toast"></div>
 
-  <script src="js/config.js?v=202611090034"></script>
+  <script src="js/config.js?v=202611090037"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/data.js?v=202611090034"></script>
-  <script src="js/admin.js?v=202611090034"></script>
+  <script src="js/data.js?v=202611090037"></script>
+  <script src="js/admin.js?v=202611090037"></script>
   <script type="module">
     import * as T from "./supabase/functions/_shared/templates.js";
     window.EMAIL_T = T;
