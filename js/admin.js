@@ -262,13 +262,21 @@
     const num = url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(o.tracking_number)}</a>` : esc(o.tracking_number);
     return `<div class="small">${esc(o.carrier || "")}</div>${num} <button class="small link" data-ship="${esc(o.id)}">edit</button>`;
   }
+  // "Email customer" button: opens a new email with the order details filled in
+  function customerMailto(o) {
+    const first = (o.customer_name || "").trim().split(/\s+/)[0] || "there";
+    const items = (o.items || []).map(i => `- ${i.qty}x ${i.name} (${i.size})`).join("\n");
+    const subject = `Your HS Sourced It order ${o.id}`;
+    const body = `Hi ${first},\n\nI'm getting in touch about your order ${o.id}:\n${items}\n\n\n\nThanks,\nHS Sourced It\n${C.contactEmail || ""}`;
+    return `mailto:${o.customer_email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  }
   function renderOrders() {
     const st = $("#orderFilter").value;
     const list = orders.filter(o => !st || o.status === st);
     $("#ordersTable").innerHTML = `<thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th>Tracking</th></tr></thead><tbody>` +
       (list.length ? list.map(o => `<tr data-row="${esc(o.id)}">
         <td><strong>${esc(o.id)}</strong>${o.offer_token ? `<div><span class="pill on">Friends & family</span></div>` : ""}</td><td>${fmtDate(o.created_at)}</td>
-        <td>${esc(o.customer_name || "")}<div class="small">${esc(o.customer_email)}</div>${o.shipping_address ? `<div class="small">${esc(o.shipping_address)}</div>` : ""}</td>
+        <td>${esc(o.customer_name || "")}<div class="small">${esc(o.customer_email)}</div>${o.shipping_address ? `<div class="small">${esc(o.shipping_address)}</div>` : ""}${o.customer_email ? `<a class="email-cust" href="${esc(customerMailto(o))}">✉ Email customer</a>` : ""}</td>
         <td>${(o.items || []).map(i => `${i.qty}× ${esc(i.name)} <span class="small">(${esc(i.size)})</span>${i.backorder ? ` <span class="pill wait">pre-order · ${esc(i.lead_time || "")}</span>` : ""}`).join("<br>")}</td>
         <td>${money(o.total)}</td>
         <td><select data-oid="${esc(o.id)}">${STATUSES.map(s => `<option ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}</select></td>
