@@ -236,6 +236,19 @@
       return { demo: true, emailed: false };
     },
 
+    // Personal messages to customers (sent from the shop inbox, saved against the order)
+    async getMessages(orderId) {
+      if (LIVE) return q(client().from("customer_messages").select("*").eq("order_id", orderId).order("created_at", { ascending: true }));
+      return ls.get("messages", []).filter(m => m.order_id === orderId);
+    },
+    async sendMessage(orderId, subject, message) {
+      if (LIVE) return fn("message-customer", { orderId, subject, message });
+      const all = ls.get("messages", []);
+      const m = { id: uid(), order_id: orderId, direction: "out", subject, body: message, created_at: now() };
+      all.push(m); ls.set("messages", all);
+      return { demo: true, message: m };
+    },
+
     // Checkout
     // cart: [{id, size, qty}]
     async checkout(cart, email, offer) {

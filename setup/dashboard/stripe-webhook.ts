@@ -1,6 +1,5 @@
 // @ts-nocheck
 // stripe-webhook — single-file version for the Supabase dashboard editor (generated from supabase/functions/stripe-webhook).
-import Stripe from "npm:stripe@16";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 // ---------- shared: email helpers ----------
@@ -19,6 +18,8 @@ const FROM_ORDERS = env("EMAIL_FROM_ORDERS", "orders@example.com");
 const FROM_MARKETING = env("EMAIL_FROM_MARKETING", FROM_ORDERS);
 const REPLY_TO = env("REPLY_TO", FROM_ORDERS);
 /** Where "new order" alerts go (defaults to the shop inbox). Comma-separate for several addresses. */
+/** The shop's main inbox (hello@) — personal messages to customers are sent from here. */
+const SHOP_INBOX = REPLY_TO;
 const ORDER_NOTIFY_TO = env("ORDER_NOTIFY_TO", REPLY_TO).split(",").map((s) => s.trim()).filter(Boolean);
 const BREVO_KEY = env("BREVO_API_KEY");
 const RESEND_KEY = env("RESEND_API_KEY");
@@ -55,7 +56,7 @@ function htmlToText(html: string): string {
 }
 
 type Mail = {
-  to: string; name?: string; subject: string; html: string; replyTo?: string;
+  to: string; name?: string; subject: string; html: string; replyTo?: string; from?: string;
   kind: "marketing" | "transactional"; headers?: Record<string, string>; tags?: string[];
 };
 
@@ -64,7 +65,7 @@ class SendLimitError extends Error {}
 /** Send one email. Throws SendLimitError when the provider's daily/monthly limit is hit. */
 async function sendEmail(m: Mail): Promise<void> {
   const useResend = m.kind === "transactional" && RESEND_KEY;
-  const from = m.kind === "marketing" ? FROM_MARKETING : FROM_ORDERS;
+  const from = m.from || (m.kind === "marketing" ? FROM_MARKETING : FROM_ORDERS);
 
   if (useResend) {
     const res = await fetch("https://api.resend.com/emails", {
@@ -307,9 +308,20 @@ function newOrderAlertEmail({ orderId, name, email, phone, address, items, total
   };
 }
 
+/** A personal message to a customer, written in admin. Plain text in, line breaks kept. */
+function customerMessageEmail({ name, message, orderId, items, shopUrl, logoUrl }) {
+  const paras = String(message || "").trim().split(/\n{2,}/).map((para) => p(esc(para).replace(/\n/g, "<br>"))).join("");
+  const body = `
+    ${paras}
+    ${orderId ? `<p style="margin:22px 0 6px;font-family:${C.font};font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:${C.muted}">Order ${esc(orderId)}</p>${itemsTable(items)}` : ""}
+    ${p("Just reply to this email if you have any questions.", `color:${C.muted};font-size:13px`)}`;
+  return layout({ body, shopUrl, logoUrl, preheader: String(message || "").slice(0, 90) });
+}
+
 // ---------- function ----------
 // Stripe → Supabase: when a payment completes, record the order,
 // reduce stock, update the customer's CRM record and email a receipt.
+import Stripe from "npm:stripe@16";
 
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { apiVersion: "2024-06-20" });
 const WEBHOOK_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET")!;

@@ -167,3 +167,13 @@ export function newOrderAlertEmail({ orderId, name, email, phone, address, items
     html: layout({ body, shopUrl, logoUrl, preheader: `${(items || []).length} item(s) · ${money(total)}` }),
   };
 }
+
+/** A personal message to a customer, written in admin. Plain text in, line breaks kept. */
+export function customerMessageEmail({ name, message, orderId, items, shopUrl, logoUrl }) {
+  const paras = String(message || "").trim().split(/\n{2,}/).map((para) => p(esc(para).replace(/\n/g, "<br>"))).join("");
+  const body = `
+    ${paras}
+    ${orderId ? `<p style="margin:22px 0 6px;font-family:${C.font};font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:${C.muted}">Order ${esc(orderId)}</p>${itemsTable(items)}` : ""}
+    ${p("Just reply to this email if you have any questions.", `color:${C.muted};font-size:13px`)}`;
+  return layout({ body, shopUrl, logoUrl, preheader: String(message || "").slice(0, 90) });
+}

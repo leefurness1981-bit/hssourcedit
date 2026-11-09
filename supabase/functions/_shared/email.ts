@@ -14,6 +14,8 @@ const FROM_ORDERS = env("EMAIL_FROM_ORDERS", "orders@example.com");
 const FROM_MARKETING = env("EMAIL_FROM_MARKETING", FROM_ORDERS);
 const REPLY_TO = env("REPLY_TO", FROM_ORDERS);
 /** Where "new order" alerts go (defaults to the shop inbox). Comma-separate for several addresses. */
+/** The shop's main inbox (hello@) — personal messages to customers are sent from here. */
+export const SHOP_INBOX = REPLY_TO;
 export const ORDER_NOTIFY_TO = env("ORDER_NOTIFY_TO", REPLY_TO).split(",").map((s) => s.trim()).filter(Boolean);
 const BREVO_KEY = env("BREVO_API_KEY");
 const RESEND_KEY = env("RESEND_API_KEY");
@@ -50,7 +52,7 @@ export function htmlToText(html: string): string {
 }
 
 export type Mail = {
-  to: string; name?: string; subject: string; html: string; replyTo?: string;
+  to: string; name?: string; subject: string; html: string; replyTo?: string; from?: string;
   kind: "marketing" | "transactional"; headers?: Record<string, string>; tags?: string[];
 };
 
@@ -59,7 +61,7 @@ export class SendLimitError extends Error {}
 /** Send one email. Throws SendLimitError when the provider's daily/monthly limit is hit. */
 export async function sendEmail(m: Mail): Promise<void> {
   const useResend = m.kind === "transactional" && RESEND_KEY;
-  const from = m.kind === "marketing" ? FROM_MARKETING : FROM_ORDERS;
+  const from = m.from || (m.kind === "marketing" ? FROM_MARKETING : FROM_ORDERS);
 
   if (useResend) {
     const res = await fetch("https://api.resend.com/emails", {

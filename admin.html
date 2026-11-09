@@ -7,8 +7,8 @@
   <title>HS Sourced It — Admin</title>
   <link rel="icon" href="images/favicon.png">
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Source+Serif+4:opsz,wght@8..60,900&family=Archivo:wght@400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=202611090045">
-  <link rel="stylesheet" href="css/admin.css?v=202611090045">
+  <link rel="stylesheet" href="css/style.css?v=202611090049">
+  <link rel="stylesheet" href="css/admin.css?v=202611090049">
 </head>
 <body class="admin">
   <!-- Login -->
@@ -208,6 +208,22 @@
     </form>
   </div>
 
+  <!-- Message a customer about an order -->
+  <div class="overlay" id="msgEditor" hidden>
+    <form class="modal edit-modal" id="msgForm">
+      <button type="button" class="close" data-close>×</button>
+      <h2>Message customer</h2>
+      <p class="small" id="msgTo"></p>
+      <div id="msgHistory"></div>
+      <div class="form-grid">
+        <label class="full">Subject <input name="subject" required></label>
+        <label class="full">Message <textarea name="message" rows="8" required placeholder="Write your message…"></textarea></label>
+      </div>
+      <p class="small">Sent from hello@hssourcedit.com with your logo, and the order's items listed underneath. Their reply comes to the hello@ inbox in Zoho.</p>
+      <div class="row-btns"><button type="button" class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-accent" id="msgSend">Send message</button></div>
+    </form>
+  </div>
+
   <!-- Mark as shipped -->
   <div class="overlay" id="shipEditor" hidden>
     <form class="modal edit-modal ship-modal" id="shipForm">
@@ -226,10 +242,10 @@
 
   <div class="toast" id="toast"></div>
 
-  <script src="js/config.js?v=202611090045"></script>
+  <script src="js/config.js?v=202611090049"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/data.js?v=202611090045"></script>
-  <script src="js/admin.js?v=202611090045"></script>
+  <script src="js/data.js?v=202611090049"></script>
+  <script src="js/admin.js?v=202611090049"></script>
   <script type="module">
     import * as T from "./supabase/functions/_shared/templates.js";
     window.EMAIL_T = T;
