@@ -53,11 +53,33 @@
   }
 
   // ---------- tabs ----------
-  $("#tabs").addEventListener("click", e => {
-    const tab = e.target.dataset.tab; if (!tab) return;
+  // Tabs work with the phone's back gesture: any tab → back → Dashboard (never straight out to the shop)
+  const TABS = ["dashboard", "stock", "orders", "customers", "offers", "email", "settings"];
+  let curTab = "dashboard";
+  function showTab(tab) {
+    curTab = tab;
     $$("#tabs button").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
     $$("[data-panel]").forEach(p => (p.hidden = p.dataset.panel !== tab));
+    window.scrollTo(0, 0);
+  }
+  function goTab(tab) {
+    if (tab === curTab) return;
+    if (tab === "dashboard") { if (history.state && history.state.tab && history.state.tab !== "dashboard") history.back(); else showTab(tab); return; }
+    const url = location.pathname + location.search + "#" + tab;
+    if (curTab === "dashboard") history.pushState({ tab }, "", url); else history.replaceState({ tab }, "", url);
+    showTab(tab);
+  }
+  window.addEventListener("popstate", e => {
+    const tab = (e.state && e.state.tab) || location.hash.slice(1) || "dashboard";
+    $$(".overlay").forEach(o => (o.hidden = true));
+    showTab(TABS.includes(tab) ? tab : "dashboard");
   });
+  {
+    const start = location.hash.slice(1);
+    history.replaceState({ tab: "dashboard" }, "", location.pathname + location.search);
+    if (TABS.includes(start) && start !== "dashboard") { history.pushState({ tab: start }, "", location.pathname + location.search + "#" + start); showTab(start); }
+  }
+  $("#tabs").addEventListener("click", e => { const tab = e.target.dataset.tab; if (tab) goTab(tab); });
 
   // ---------- dashboard ----------
   function renderDashboard() {
@@ -76,10 +98,10 @@
     const low = [];
     products.forEach(p => sizeEntries(p).forEach(([s, n]) => { if (n <= C.lowStockThreshold) low.push({ p, s, n }); }));
     $("#lowStock").innerHTML = low.length ? low.sort((a, b) => a.n - b.n).slice(0, 12).map(({ p, s, n }) =>
-      `<div class="mini"><span>${esc(p.name)} — ${esc(s)}</span><span class="pill ${n === 0 ? "refunded" : "packed"}">${n === 0 ? "Out" : n + " left"}</span></div>`).join("")
+      `<button type="button" class="mini mini-link" data-goprod="${esc(p.id)}"><span>${esc(p.name)} — ${esc(s)}</span><span><span class="pill ${n === 0 ? "refunded" : "packed"}">${n === 0 ? "Out" : n + " left"}</span> ›</span></button>`).join("")
       : `<p class="small">All sizes healthy.</p>`;
     $("#recentOrders").innerHTML = orders.length ? orders.slice(0, 6).map(o =>
-      `<div class="mini"><span>${esc(o.id)} · ${esc(o.customer_email)}</span><span>${money(o.total)} <span class="pill ${o.status}">${o.status}</span></span></div>`).join("")
+      `<button type="button" class="mini mini-link" data-goto="${esc(o.id)}"><span>${esc(o.id)} · ${esc(o.customer_email)}</span><span>${money(o.total)} <span class="pill ${o.status}">${o.status}</span> ›</span></button>`).join("")
       : `<p class="small">No orders yet.</p>`;
   }
 
@@ -279,8 +301,7 @@
     const f = $("#shipForm"); const o = orders.find(x => x.id === f.dataset.id);
     showAutoPreview("shipped", { orderId: o.id, name: o.customer_name, items: o.items, carrier: f.elements.carrier.value, trackingNumber: f.elements.tracking_number.value });
     close("#shipEditor");
-    $$("#tabs button").forEach(b => b.classList.toggle("active", b.dataset.tab === "email"));
-    $$("[data-panel]").forEach(p => (p.hidden = p.dataset.panel !== "email"));
+    goTab("email");
   };
   $("#shipForm").onsubmit = async e => {
     e.preventDefault(); const f = e.target; const o = orders.find(x => x.id === f.dataset.id);
@@ -325,19 +346,17 @@
     open("#custEditor");
   }
   // Click an order in a customer's history → jump to it on the Orders tab
-  function showTab(tab) {
-    $$("#tabs button").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
-    $$("[data-panel]").forEach(p => (p.hidden = p.dataset.panel !== tab));
-  }
   function goToOrder(id) {
     close("#custEditor");
-    showTab("orders");
+    goTab("orders");
     $("#orderFilter").value = ""; renderOrders();
     const row = $$("#ordersTable tr[data-row]").find(r => r.dataset.row === id);
     if (!row) return toast("Couldn't find that order");
     row.scrollIntoView({ behavior: "smooth", block: "center" });
     row.classList.remove("flash"); void row.offsetWidth; row.classList.add("flash");
   }
+  $("#recentOrders").addEventListener("click", e => { const b = e.target.closest("[data-goto]"); if (b) goToOrder(b.dataset.goto); });
+  $("#lowStock").addEventListener("click", e => { const b = e.target.closest("[data-goprod]"); if (b) { goTab("stock"); editProduct(b.dataset.goprod); } });
   $("#custOrders").addEventListener("click", e => { const b = e.target.closest("[data-goto]"); if (b) goToOrder(b.dataset.goto); });
   $("#custForm").onsubmit = async e => {
     e.preventDefault(); const f = e.target;
