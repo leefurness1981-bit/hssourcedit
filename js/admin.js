@@ -56,7 +56,7 @@
 
   // ---------- tabs ----------
   // Tabs work with the phone's back gesture: any tab → back → Dashboard (never straight out to the shop)
-  const TABS = ["dashboard", "stock", "orders", "customers", "offers", "email", "settings"];
+  const TABS = ["dashboard", "stock", "orders", "customers", "offers", "email", "activity", "settings"];
   let curTab = "dashboard";
   function showTab(tab) {
     curTab = tab;
@@ -64,6 +64,7 @@
     $$("[data-panel]").forEach(p => (p.hidden = p.dataset.panel !== tab));
     window.scrollTo(0, 0);
     if (tab === "settings") loadTermsEditor();
+    if (tab === "activity") loadActivity(true);
   }
   function goTab(tab) {
     if (tab === curTab) return;
@@ -318,7 +319,7 @@
         <td class="oc-cust">${esc(o.customer_name || "")}<div class="small">${esc(o.customer_email)}</div>${o.shipping_address ? `<div class="small">${esc(o.shipping_address)}</div>` : ""}${o.customer_email ? `<button type="button" class="email-cust" data-msg="${esc(o.id)}">✉ Message customer</button>` : ""}${msgsForOrder(o.id).length ? `<button type="button" class="msg-count" data-msg="${esc(o.id)}">💬 ${msgsForOrder(o.id).length} message${msgsForOrder(o.id).length === 1 ? "" : "s"} · view</button>` : ""}</td>
         <td class="oc-items">${(o.items || []).map(i => `<div class="oc-item">${i.qty}× ${esc(i.name)} <span class="small">(${esc(i.size)})</span>${i.backorder ? ` <span class="pill wait">${esc(i.lead_time || "Out of stock")}</span>` : ""}</div>`).join("")}</td>
         <td class="oc-hide">${money(o.total)}</td>
-        <td class="oc-status"><select data-oid="${esc(o.id)}">${STATUSES.map(s => `<option ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}</select></td>
+        <td class="oc-status"><select data-oid="${esc(o.id)}">${STATUSES.map(s => `<option ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}</select><button type="button" class="msg-count" data-hist="${esc(o.id)}">🕘 History</button></td>
         <td class="oc-track">${trackCell(o)}</td></tr>`).join("")
       : `<tr><td colspan="7" class="small">${$("#orderSearch").value.trim() || $("#orderFilter").value ? "No orders match your search." : "No orders."}</td></tr>`) + "</tbody>";
   }
@@ -540,6 +541,90 @@
       f.reset(); lastTemplate = ""; preview(); campaigns = await Store.getCampaigns(); renderEmail();
     } catch (err) { toast(err.message); }
   };
+
+  // ---------- activity log ----------
+  const fmtTime = d => new Date(d).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  const who = a => a === "system" ? "system" : String(a || "").replace(/@.*/, "@");
+  const gbp = v => v == null || v === "" ? "—" : money(v);
+  const onoff = v => (v === true || v === "true") ? "on" : "off";
+  const FIELD = {
+    price: ["price", gbp], family_price: ["friends & family price", gbp], shipping_cost: ["delivery", gbp],
+    lead_time: ["wait time", v => v || "—"], badge: ["badge", v => v || "none"], category: ["category", v => v],
+    name: ["name", v => v], allow_backorder: ["ordering when out of stock", onoff], active: ["on the site", v => (v ? "shown" : "hidden")],
+    status: ["status", v => v], carrier: ["courier", v => v || "—"], tracking_number: ["tracking", v => v || "—"],
+    marketing_opt_in: ["marketing", onoff], tags: ["tags", v => (v || []).join(", ") || "none"], phone: ["phone", v => v || "—"],
+    order_count: ["orders", v => v], total_spent: ["total spent", gbp], welcome_code: ["welcome code", v => v || "—"],
+    title: ["title", v => v], published: ["on the site", v => (v ? "shown" : "hidden")], max_qty: ["max items", v => v],
+    expires_at: ["expires", v => (v ? fmtDate(v) : "never")]
+  };
+  const QUIET = ["shipped_at", "created_at", "welcome_sent_at", "welcome_code_expires_at", "welcome_code_failed_at", "reserved_until", "stripe_session_id", "used_at", "image"];
+  function describe(a) {
+    if (a.action === "event") return a.summary;
+    const c = a.changes || {}, t = a.table_name;
+    const noun = { products: "product", orders: "order", customers: "customer", offers: "friends & family offer", site_pages: "page", customer_messages: "message" }[t] || t;
+    if (a.action === "insert") {
+      if (t === "orders") return `Order placed and paid · ${gbp(c.total)} · ${c.customer_email || ""}`;
+      if (t === "customers") return c.marketing_opt_in ? "Joined the mailing list" : "New customer";
+      if (t === "offers") return `Offer created for ${c.email} · ${gbp(c.price)}`;
+      if (t === "customer_messages") return `Message sent to customer: "${c.subject || ""}"`;
+      return `Added ${noun}`;
+    }
+    if (a.action === "delete") return `Deleted ${noun}`;
+    const parts = [];
+    for (const [k, [from, to]] of Object.entries(c)) {
+      if (k === "sizes") {
+        const keys = new Set([...Object.keys(from || {}), ...Object.keys(to || {})]);
+        keys.forEach(sz => {
+          const x = (from || {})[sz], y = (to || {})[sz];
+          if (x === y) return;
+          parts.push(x == null ? `added size ${sz} (${y})` : y == null ? `removed size ${sz}` : `${sz} stock ${x} → ${y}`);
+        });
+      } else if (k === "image") parts.push("photo changed");
+      else if (k === "description") parts.push("description edited");
+      else if (k === "notes") parts.push("notes edited");
+      else if (k === "body") parts.push("wording edited");
+      else if (FIELD[k]) { const [label, f] = FIELD[k]; parts.push(`${label} ${f(from)} → ${f(to)}`); }
+      else if (!QUIET.includes(k)) parts.push(`${k.replace(/_/g, " ")} changed`);
+    }
+    return parts.join(" · ") || "Updated";
+  }
+  const GROUP = t => ["products", "orders", "customers", "offers"].includes(t) ? t : "other";
+  let activity = [], activityLoaded = false;
+  async function loadActivity(force) {
+    if (activityLoaded && !force) return renderActivity();
+    try { activity = await Store.getActivity(); activityLoaded = true; renderActivity(); }
+    catch (err) { $("#actList").innerHTML = `<p class="small">Couldn't load the activity log: ${esc(err.message)}</p>`; }
+  }
+  function renderActivity() {
+    const f = $("#actFilter").value, term = $("#actSearch").value.trim().toLowerCase();
+    const rows = activity.map(a => ({ a, text: describe(a) }))
+      .filter(({ a, text }) => (!f || GROUP(a.table_name) === f) &&
+        (!term || term.split(/\s+/).every(w => [a.label, a.actor, text, a.record_id].join(" ").toLowerCase().includes(w))));
+    $("#actList").innerHTML = rows.length ? rows.map(({ a, text }) => {
+      const link = a.table_name === "orders" ? `data-goto="${esc(a.record_id)}"` : a.table_name === "products" && a.action !== "delete" ? `data-goprod="${esc(a.record_id)}"` : "";
+      return `<div class="act-row"><span class="act-time">${fmtTime(a.at)}</span><span class="act-who">${esc(who(a.actor))}</span>
+        <span class="act-what">${link ? `<button type="button" class="link" ${link}>${esc(a.label || a.record_id)}</button>` : `<strong>${esc(a.label || a.record_id)}</strong>`} <span class="small">${esc(text)}</span></span></div>`;
+    }).join("") : `<p class="small">${Store.live ? (activity.length ? "Nothing matches." : "No activity yet — changes will appear here from now on.") : "The activity log works on the live shop."}</p>`;
+  }
+  $("#actFilter").onchange = renderActivity;
+  $("#actSearch").oninput = renderActivity;
+  $("#actList").addEventListener("click", e => {
+    const o = e.target.closest("[data-goto]"); if (o) return goToOrder(o.dataset.goto);
+    const p = e.target.closest("[data-goprod]"); if (p) { goTab("stock"); editProduct(p.dataset.goprod); }
+  });
+  // Order history (for disputes): status changes, emails and messages for one order
+  async function openHistory(id) {
+    const o = orders.find(x => x.id === id);
+    $("#histFor").textContent = `${id}${o ? ` · ${o.customer_name || ""} ${o.customer_email ? "· " + o.customer_email : ""} · ${money(o.total)}` : ""}`;
+    $("#histList").innerHTML = `<p class="small">Loading…</p>`;
+    open("#histView");
+    try {
+      const rows = await Store.getOrderHistory(id);
+      $("#histList").innerHTML = rows.length ? `<ol class="hist">${rows.map(a => `<li><span class="act-time">${fmtTime(a.at)}</span> ${esc(describe(a))} <span class="small">· ${esc(who(a.actor))}</span></li>`).join("")}</ol>`
+        : `<p class="small">No history recorded for this order. Orders placed before the activity log was switched on only show their current status.</p>`;
+    } catch (err) { $("#histList").innerHTML = `<p class="small">Couldn't load history: ${esc(err.message)}</p>`; }
+  }
+  $("#ordersTable").addEventListener("click", e => { const b = e.target.closest("[data-hist]"); if (b) openHistory(b.dataset.hist); });
 
   // ---------- settings ----------
   // ---------- Terms page editor (Settings) ----------

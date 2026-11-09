@@ -1,7 +1,7 @@
 // Stripe → Supabase: when a payment completes, record the order,
 // reduce stock, update the customer's CRM record and email a receipt.
 import Stripe from "npm:stripe@16";
-import { db, sendEmail, SITE_URL, LOGO_URL, ORDER_NOTIFY_TO } from "../_shared/email.ts";
+import { db, sendEmail, SITE_URL, LOGO_URL, ORDER_NOTIFY_TO, logEvent } from "../_shared/email.ts";
 import { orderConfirmedEmail, newOrderAlertEmail } from "../_shared/templates.js";
 
 const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY")!, { apiVersion: "2024-06-20" });
@@ -90,7 +90,7 @@ Deno.serve(async (req) => {
     if (email) {
       const { subject, html } = orderConfirmedEmail({ orderId, name, items, total, address, shopUrl: SITE_URL, logoUrl: LOGO_URL });
       await sendEmail({ to: email, name, subject, html, kind: "transactional", tags: ["order"] })
-        .then(() => console.log("Order email sent to", email))
+        .then(async () => { console.log("Order email sent to", email); await logEvent("orders", orderId, orderId, `Order confirmation emailed to ${email}`); })
         .catch((e) => console.error("Order email failed", e));
     }
 
@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
     });
     for (const to of ORDER_NOTIFY_TO) {
       await sendEmail({ to, subject: alert.subject, html: alert.html, kind: "transactional", tags: ["order-alert"], replyTo: email || undefined })
-        .then(() => console.log("Order alert sent to", to))
+        .then(async () => { console.log("Order alert sent to", to); await logEvent("orders", orderId, orderId, `New-order alert sent to ${to}`); })
         .catch((e) => console.error("Order alert failed", to, e));
     }
    } catch (e) {

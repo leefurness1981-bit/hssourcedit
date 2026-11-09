@@ -1,5 +1,5 @@
 // Admin-only: create a one-time friends & family offer for one product and email the link.
-import { db, json, cors, requireAdmin, sendEmail, SITE_URL, LOGO_URL } from "../_shared/email.ts";
+import { db, json, cors, requireAdmin, sendEmail, SITE_URL, LOGO_URL, claimAudit } from "../_shared/email.ts";
 import { offerEmail } from "../_shared/templates.js";
 
 function makeToken() {
@@ -9,7 +9,8 @@ function makeToken() {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if (!(await requireAdmin(req))) return json({ error: "Not an admin" }, 403);
+  const admin = await requireAdmin(req);
+  if (!admin) return json({ error: "Not an admin" }, 403);
 
   const body = await req.json().catch(() => ({}));
   const email = String(body.email ?? "").trim().toLowerCase();
@@ -30,6 +31,7 @@ Deno.serve(async (req) => {
   const { error: oErr } = await db.from("offers").insert({ token, product_id: product.id, email, name, price, max_qty: maxQty, expires_at });
   if (oErr) return json({ error: oErr.message }, 500);
 
+  await claimAudit("offers", token, admin);
   const url = `${SITE_URL}?offer=${encodeURIComponent(token)}`;
   const img = String(product.image || "");
   const imageUrl = img.startsWith("http") ? img : img && !img.startsWith("data:") ? SITE_URL + img.replace(/^\/+/, "") : "";

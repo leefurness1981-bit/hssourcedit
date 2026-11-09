@@ -7,8 +7,8 @@
   <title>HS Sourced It — Admin</title>
   <link rel="icon" href="images/favicon.png">
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Source+Serif+4:opsz,wght@8..60,900&family=Archivo:wght@400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=202611091941">
-  <link rel="stylesheet" href="css/admin.css?v=202611091941">
+  <link rel="stylesheet" href="css/style.css?v=202611091952">
+  <link rel="stylesheet" href="css/admin.css?v=202611091952">
 </head>
 <body class="admin">
   <!-- Login -->
@@ -32,6 +32,7 @@
         <button data-tab="customers">Customers</button>
         <button data-tab="offers">Offers</button>
         <button data-tab="email">Email</button>
+        <button data-tab="activity">Activity</button>
         <button data-tab="settings">Settings</button>
       </nav>
       <div class="side-foot">
@@ -122,6 +123,13 @@
       </section>
 
       <!-- Settings -->
+      <section data-panel="activity" hidden>
+        <div class="head"><h1>Activity</h1><input type="search" id="actSearch" placeholder="Search name, order, email, who">
+          <select id="actFilter"><option value="">Everything</option><option value="products">Products &amp; stock</option><option value="orders">Orders</option><option value="customers">Customers</option><option value="offers">Offers</option><option value="other">Pages &amp; messages</option></select></div>
+        <p class="small">Every change is recorded automatically, with who made it. "system" means the website itself (an order coming in, stock going down, a sign-up). Kept for a year.</p>
+        <div class="panel"><div id="actList"><p class="small">Loading…</p></div></div>
+      </section>
+
       <section data-panel="settings" hidden>
         <h1>Settings</h1>
         <div class="panel">
@@ -222,6 +230,17 @@
   </div>
 
   <!-- Message a customer about an order -->
+  <!-- Order history (for disputes) -->
+  <div class="overlay" id="histView" hidden>
+    <div class="modal edit-modal">
+      <button type="button" class="close" data-close>×</button>
+      <h2>Order history</h2>
+      <p class="small" id="histFor"></p>
+      <div id="histList"></div>
+      <p class="small" style="margin-top:1rem">Recorded automatically and can't be edited. Times are UK time.</p>
+    </div>
+  </div>
+
   <div class="overlay" id="msgEditor" hidden>
     <form class="modal edit-modal" id="msgForm">
       <button type="button" class="close" data-close>×</button>
@@ -255,12 +274,12 @@
 
   <div class="toast" id="toast"></div>
 
-  <script src="js/config.js?v=202611091941"></script>
+  <script src="js/config.js?v=202611091952"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/data.js?v=202611091941"></script>
-  <script src="js/markdown.js?v=202611091941"></script>
-  <script src="js/default-pages.js?v=202611091941"></script>
-  <script src="js/admin.js?v=202611091941"></script>
+  <script src="js/data.js?v=202611091952"></script>
+  <script src="js/markdown.js?v=202611091952"></script>
+  <script src="js/default-pages.js?v=202611091952"></script>
+  <script src="js/admin.js?v=202611091952"></script>
   <script type="module">
     import * as T from "./supabase/functions/_shared/templates.js";
     window.EMAIL_T = T;

@@ -1,6 +1,6 @@
 // Admin-only: send a personal message to a customer (from the shop inbox, replies come back there)
 // and keep a copy so it shows on the order.
-import { db, json, cors, requireAdmin, sendEmail, SHOP_INBOX, SITE_URL, LOGO_URL } from "../_shared/email.ts";
+import { db, json, cors, requireAdmin, sendEmail, SHOP_INBOX, SITE_URL, LOGO_URL, claimAudit } from "../_shared/email.ts";
 import { customerMessageEmail } from "../_shared/templates.js";
 
 Deno.serve(async (req) => {
@@ -29,5 +29,6 @@ Deno.serve(async (req) => {
   const { data: saved, error } = await db.from("customer_messages").insert({
     order_id: order?.id ?? null, customer_email: email, direction: "out", subject: subject.trim(), body: message.trim(), sent_by: admin,
   }).select().single();
+  if (saved) await claimAudit("customer_messages", saved.id, admin);
   return json({ ok: true, message: saved, logError: error?.message });
 });

@@ -325,6 +325,18 @@
       if (LIVE) return fn("send-welcome-code", { email });
       return { demo: true, code: "WELCOME-DEMO23", expiresAt: new Date(Date.now() + 30 * 86400000).toISOString() };
     },
+    // Activity log (audit_log table, written by the database itself)
+    async getActivity(limit = 500) {
+      if (LIVE) return q(client().from("audit_log").select("*").order("at", { ascending: false }).limit(limit));
+      return ls.get("activity", []);
+    },
+    async getOrderHistory(id) {
+      if (LIVE) return q(client().from("audit_log").select("*")
+        .or(`and(table_name.eq.orders,record_id.eq.${id}),and(table_name.eq.customer_messages,label.eq.${id})`)
+        .order("at", { ascending: true }));
+      return ls.get("activity", []).filter(a => (a.table_name === "orders" && a.record_id === id) || (a.table_name === "customer_messages" && a.label === id)).reverse();
+    },
+
     // Editable pages (Terms etc.) — Admin > Settings
     async getPage(slug) {
       if (LIVE) { const rows = await q(client().from("site_pages").select("*").eq("slug", slug)); return rows[0] || null; }

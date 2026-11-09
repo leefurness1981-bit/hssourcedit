@@ -138,6 +138,21 @@ async function requireAdmin(req: Request): Promise<string | null> {
   return data ? user.email : null;
 }
 
+// ---------- Activity log helpers (audit_log table, see migration 0009) ----------
+/** Record something that isn't a table change, e.g. an email being sent. Never throws. */
+async function logEvent(table: string, recordId: string, label: string, summary: string, details: Record<string, unknown> = {}, actor = "system") {
+  try { await db.from("audit_log").insert({ actor, table_name: table, record_id: recordId, label, action: "event", summary, changes: details }); }
+  catch (e) { console.error("logEvent failed", e); }
+}
+/** Changes made by these server functions are logged as 'system'; when an admin asked for them, put their email on the rows just written. */
+async function claimAudit(table: string, recordId: string, actor: string | null) {
+  if (!actor) return;
+  try {
+    await db.from("audit_log").update({ actor }).eq("table_name", table).eq("record_id", recordId).eq("actor", "system")
+      .gte("at", new Date(Date.now() - 60000).toISOString());
+  } catch (e) { console.error("claimAudit failed", e); }
+}
+
 // ---------- shared: email designs ----------
 // =========================================================
 // HS Sourced It — email designs
@@ -398,7 +413,8 @@ async function createWelcomeCode(email: string): Promise<{ code: string; expires
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if (!(await requireAdmin(req))) return json({ error: "Not an admin" }, 403);
+  const admin = await requireAdmin(req);
+  if (!admin) return json({ error: "Not an admin" }, 403);
   try {
     const { email: raw = "" } = await req.json();
     const email = String(raw).trim().toLowerCase();
@@ -411,6 +427,7 @@ Deno.serve(async (req) => {
       welcome_code: code, welcome_code_expires_at: expiresAt.toISOString(), welcome_code_failed_at: null,
       welcome_sent_at: new Date().toISOString(),
     }).eq("email", email);
+    await claimAudit("customers", email, admin);
     const { subject, html } = welcomeEmail({ name: c.name, code, percent: WELCOME_PERCENT, expiresAt, existing: true, shopUrl: SITE_URL, logoUrl: LOGO_URL });
     await sendMarketing(email, c.name, subject, html, ["welcome-code"]);
     return json({ ok: true, code, expiresAt: expiresAt.toISOString() });

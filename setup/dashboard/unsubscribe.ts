@@ -137,6 +137,21 @@ async function requireAdmin(req: Request): Promise<string | null> {
   return data ? user.email : null;
 }
 
+// ---------- Activity log helpers (audit_log table, see migration 0009) ----------
+/** Record something that isn't a table change, e.g. an email being sent. Never throws. */
+async function logEvent(table: string, recordId: string, label: string, summary: string, details: Record<string, unknown> = {}, actor = "system") {
+  try { await db.from("audit_log").insert({ actor, table_name: table, record_id: recordId, label, action: "event", summary, changes: details }); }
+  catch (e) { console.error("logEvent failed", e); }
+}
+/** Changes made by these server functions are logged as 'system'; when an admin asked for them, put their email on the rows just written. */
+async function claimAudit(table: string, recordId: string, actor: string | null) {
+  if (!actor) return;
+  try {
+    await db.from("audit_log").update({ actor }).eq("table_name", table).eq("record_id", recordId).eq("actor", "system")
+      .gte("at", new Date(Date.now() - 60000).toISOString());
+  } catch (e) { console.error("claimAudit failed", e); }
+}
+
 // ---------- function ----------
 // One-click unsubscribe link used in marketing emails (GET from the link, POST from mail apps).
 // Supabase shows HTML from functions as plain text, so a clicked link is sent on to a page on the shop instead.

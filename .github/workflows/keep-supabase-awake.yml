@@ -1,6 +1,6 @@
 # Stops the free Supabase project being paused for inactivity (Supabase pauses free projects
 # after about a week with no activity). Every 3 days this runs a small read-only query against
-# the database and the website's API. It changes nothing.
+# the database and the website's API, and clears activity-log entries older than a year.
 #
 # GitHub also switches off scheduled workflows in a repo that's had no commits for 60 days,
 # so this job switches itself (and the product-pages job) back on each time it runs.
@@ -27,6 +27,11 @@ jobs:
           if [ -z "$DB_URL" ]; then echo "::error::Secret SUPABASE_DB_URL is missing"; exit 1; fi
           psql "$DB_URL" -At -c "select 'products: ' || count(*) from public.products;"
           psql "$DB_URL" -At -c "select 'orders: ' || count(*) from public.orders;"
+      - name: Clear activity log entries older than a year
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          psql "$DB_URL" -At -c "do \$\$ begin if to_regclass('public.audit_log') is not null then delete from public.audit_log where at < now() - interval '1 year'; end if; end \$\$;"
       - name: Call the website's API
         run: |
           URL=$(grep -oP 'supabaseUrl:\s*"\K[^"]+' js/config.js)

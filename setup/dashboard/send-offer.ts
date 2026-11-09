@@ -137,6 +137,21 @@ async function requireAdmin(req: Request): Promise<string | null> {
   return data ? user.email : null;
 }
 
+// ---------- Activity log helpers (audit_log table, see migration 0009) ----------
+/** Record something that isn't a table change, e.g. an email being sent. Never throws. */
+async function logEvent(table: string, recordId: string, label: string, summary: string, details: Record<string, unknown> = {}, actor = "system") {
+  try { await db.from("audit_log").insert({ actor, table_name: table, record_id: recordId, label, action: "event", summary, changes: details }); }
+  catch (e) { console.error("logEvent failed", e); }
+}
+/** Changes made by these server functions are logged as 'system'; when an admin asked for them, put their email on the rows just written. */
+async function claimAudit(table: string, recordId: string, actor: string | null) {
+  if (!actor) return;
+  try {
+    await db.from("audit_log").update({ actor }).eq("table_name", table).eq("record_id", recordId).eq("actor", "system")
+      .gte("at", new Date(Date.now() - 60000).toISOString());
+  } catch (e) { console.error("claimAudit failed", e); }
+}
+
 // ---------- shared: email designs ----------
 // =========================================================
 // HS Sourced It — email designs
@@ -345,7 +360,8 @@ function makeToken() {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if (!(await requireAdmin(req))) return json({ error: "Not an admin" }, 403);
+  const admin = await requireAdmin(req);
+  if (!admin) return json({ error: "Not an admin" }, 403);
 
   const body = await req.json().catch(() => ({}));
   const email = String(body.email ?? "").trim().toLowerCase();
@@ -366,6 +382,7 @@ Deno.serve(async (req) => {
   const { error: oErr } = await db.from("offers").insert({ token, product_id: product.id, email, name, price, max_qty: maxQty, expires_at });
   if (oErr) return json({ error: oErr.message }, 500);
 
+  await claimAudit("offers", token, admin);
   const url = `${SITE_URL}?offer=${encodeURIComponent(token)}`;
   const img = String(product.image || "");
   const imageUrl = img.startsWith("http") ? img : img && !img.startsWith("data:") ? SITE_URL + img.replace(/^\/+/, "") : "";

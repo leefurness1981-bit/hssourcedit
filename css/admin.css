@@ -187,3 +187,14 @@ button.link { text-decoration: underline; color: var(--muted); }
 .page-preview p { line-height: 1.6; color: #d4d4d4; }
 .camp-img { display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; margin: -.3rem 0 1rem; }
 .camp-img .btn-sm { padding: .45rem .9rem; font-size: .75rem; }
+/* Activity log */
+.act-row { display: grid; grid-template-columns: 7.5rem 5.5rem 1fr; gap: .8rem; padding: .6rem 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+.act-row:last-child { border-bottom: 0; }
+.act-time { color: var(--muted); font-size: .82rem; white-space: nowrap; }
+.act-who { color: #bdbdbd; font-size: .82rem; overflow: hidden; text-overflow: ellipsis; }
+.act-what .link { background: none; border: 0; padding: 0; color: #fff; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+@media (max-width: 760px) { .act-row { grid-template-columns: 1fr; gap: .15rem; } }
+ol.hist { list-style: none; padding: 0; margin: 0; }
+ol.hist li { padding: .55rem 0; border-bottom: 1px solid var(--line); line-height: 1.5; }
+ol.hist li:last-child { border-bottom: 0; }
+.oc-status .msg-count { margin-top: .5rem; }

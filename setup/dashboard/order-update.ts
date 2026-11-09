@@ -137,6 +137,21 @@ async function requireAdmin(req: Request): Promise<string | null> {
   return data ? user.email : null;
 }
 
+// ---------- Activity log helpers (audit_log table, see migration 0009) ----------
+/** Record something that isn't a table change, e.g. an email being sent. Never throws. */
+async function logEvent(table: string, recordId: string, label: string, summary: string, details: Record<string, unknown> = {}, actor = "system") {
+  try { await db.from("audit_log").insert({ actor, table_name: table, record_id: recordId, label, action: "event", summary, changes: details }); }
+  catch (e) { console.error("logEvent failed", e); }
+}
+/** Changes made by these server functions are logged as 'system'; when an admin asked for them, put their email on the rows just written. */
+async function claimAudit(table: string, recordId: string, actor: string | null) {
+  if (!actor) return;
+  try {
+    await db.from("audit_log").update({ actor }).eq("table_name", table).eq("record_id", recordId).eq("actor", "system")
+      .gte("at", new Date(Date.now() - 60000).toISOString());
+  } catch (e) { console.error("claimAudit failed", e); }
+}
+
 // ---------- shared: email designs ----------
 // =========================================================
 // HS Sourced It — email designs
@@ -342,7 +357,8 @@ const STATUSES = ["paid", "packed", "shipped", "delivered", "refunded"];
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if (!(await requireAdmin(req))) return json({ error: "Not an admin" }, 403);
+  const admin = await requireAdmin(req);
+  if (!admin) return json({ error: "Not an admin" }, 403);
 
   const { id, status, carrier = "", tracking_number = "", notify = false } = await req.json();
   if (!id || !STATUSES.includes(status)) return json({ error: "Bad request" }, 400);
@@ -351,6 +367,7 @@ Deno.serve(async (req) => {
   if (status === "shipped") patch.shipped_at = new Date().toISOString();
   const { data: order, error } = await db.from("orders").update(patch).eq("id", id).select().single();
   if (error) return json({ error: error.message }, 500);
+  await claimAudit("orders", order.id, admin);
 
   let emailed = false;
   if (status === "shipped" && notify && order.customer_email) {
@@ -358,7 +375,10 @@ Deno.serve(async (req) => {
       orderId: order.id, name: order.customer_name, items: order.items,
       carrier, trackingNumber: tracking_number, shopUrl: SITE_URL, logoUrl: LOGO_URL,
     });
-    try { await sendEmail({ to: order.customer_email, name: order.customer_name, subject, html, kind: "transactional", tags: ["shipped"] }); emailed = true; }
+    try {
+      await sendEmail({ to: order.customer_email, name: order.customer_name, subject, html, kind: "transactional", tags: ["shipped"] }); emailed = true;
+      await logEvent("orders", order.id, order.id, `Shipped email sent to ${order.customer_email}`, { carrier, tracking_number }, admin);
+    }
     catch (e) { return json({ error: "Order updated, but the email failed: " + (e as Error).message, order }, 502); }
   }
   return json({ ok: true, emailed, order });

@@ -137,6 +137,21 @@ async function requireAdmin(req: Request): Promise<string | null> {
   return data ? user.email : null;
 }
 
+// ---------- Activity log helpers (audit_log table, see migration 0009) ----------
+/** Record something that isn't a table change, e.g. an email being sent. Never throws. */
+async function logEvent(table: string, recordId: string, label: string, summary: string, details: Record<string, unknown> = {}, actor = "system") {
+  try { await db.from("audit_log").insert({ actor, table_name: table, record_id: recordId, label, action: "event", summary, changes: details }); }
+  catch (e) { console.error("logEvent failed", e); }
+}
+/** Changes made by these server functions are logged as 'system'; when an admin asked for them, put their email on the rows just written. */
+async function claimAudit(table: string, recordId: string, actor: string | null) {
+  if (!actor) return;
+  try {
+    await db.from("audit_log").update({ actor }).eq("table_name", table).eq("record_id", recordId).eq("actor", "system")
+      .gte("at", new Date(Date.now() - 60000).toISOString());
+  } catch (e) { console.error("claimAudit failed", e); }
+}
+
 // ---------- shared: email designs ----------
 // =========================================================
 // HS Sourced It — email designs
@@ -426,7 +441,7 @@ Deno.serve(async (req) => {
     if (email) {
       const { subject, html } = orderConfirmedEmail({ orderId, name, items, total, address, shopUrl: SITE_URL, logoUrl: LOGO_URL });
       await sendEmail({ to: email, name, subject, html, kind: "transactional", tags: ["order"] })
-        .then(() => console.log("Order email sent to", email))
+        .then(async () => { console.log("Order email sent to", email); await logEvent("orders", orderId, orderId, `Order confirmation emailed to ${email}`); })
         .catch((e) => console.error("Order email failed", e));
     }
 
@@ -437,7 +452,7 @@ Deno.serve(async (req) => {
     });
     for (const to of ORDER_NOTIFY_TO) {
       await sendEmail({ to, subject: alert.subject, html: alert.html, kind: "transactional", tags: ["order-alert"], replyTo: email || undefined })
-        .then(() => console.log("Order alert sent to", to))
+        .then(async () => { console.log("Order alert sent to", to); await logEvent("orders", orderId, orderId, `New-order alert sent to ${to}`); })
         .catch((e) => console.error("Order alert failed", to, e));
     }
    } catch (e) {
