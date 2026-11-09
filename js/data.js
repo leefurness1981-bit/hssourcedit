@@ -217,7 +217,7 @@
       if (ex) { ex.marketing_opt_in = true; if (!ex.tags.includes("newsletter")) ex.tags.push("newsletter"); }
       else all.unshift({ id: uid(), email, name, phone: "", tags: ["newsletter"], notes: "", marketing_opt_in: true, total_spent: 0, order_count: 0, created_at: now() });
       ls.set("customers", all);
-      return { demo: true, code: C.welcomeCode };
+      return { demo: true };
     },
 
     // Orders

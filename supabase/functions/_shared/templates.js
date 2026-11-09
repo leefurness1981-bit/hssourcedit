@@ -55,7 +55,7 @@ export function layout({ body, shopUrl, logoUrl, preheader = "", footer = "" }) 
 }
 
 /** Welcome email sent when someone joins the list. */
-/** @param {{ name?: string, code: string, percent?: number, expiresAt?: Date | string | null, existing?: boolean, shopUrl: string, logoUrl: string }} o */
+/** @param {{ name?: string, code?: string, percent?: number, expiresAt?: Date | string | null, existing?: boolean, shopUrl: string, logoUrl: string }} o */
 export function welcomeEmail({ name, code, percent = 5, expiresAt = null, existing = false, shopUrl, logoUrl }) {
   const hi = first(name) ? `Welcome, ${esc(first(name))}.` : "Welcome in.";
   const by = expiresAt ? new Date(expiresAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "";
@@ -65,10 +65,11 @@ export function welcomeEmail({ name, code, percent = 5, expiresAt = null, existi
   const body = `
     ${heading(existing ? "Your personal code." : "You're on the list.")}
     ${existing ? "" : p(`${hi} You'll be first to hear about new drops, restocks and members-only deals — before anyone else.`)}
-    ${p(intro)}
+    ${code ? `${p(intro)}
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 6px"><tr>
       <td align="center" style="border:2px dashed #ffffff;border-radius:4px;padding:18px;font-family:${C.font};font-size:26px;font-weight:900;letter-spacing:3px;color:#ffffff">${esc(code)}</td></tr></table>
-    ${p(`Enter it at checkout. It's just for you and works once${by ? ` — use it by ${esc(by)}` : ""}.`, `font-size:13px;color:${C.muted};text-align:center`)}
+    ${p(`Enter it at checkout. It's just for you and works once${by ? ` — use it by ${esc(by)}` : ""}.`, `font-size:13px;color:${C.muted};text-align:center`)}`
+    : p(`Your personal code for <strong style="color:#fff">${esc(percent)}% off your first order</strong> is on its way in a separate email.`)}
     ${button(shopUrl, "Shop now")}
     ${p("Got a question or looking for something specific? Just reply to this email — it comes straight to us.")}`;
   return {

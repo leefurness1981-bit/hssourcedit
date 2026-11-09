@@ -4,8 +4,6 @@ import { db, json, cors, sendMarketing, syncBrevoContact, SITE_URL, LOGO_URL } f
 import { welcomeEmail } from "../_shared/templates.js";
 import { createWelcomeCode, WELCOME_PERCENT as PERCENT } from "../_shared/welcome-code.ts";
 
-// Fallback shared code, only used if Stripe can't create a personal code at that moment
-const FALLBACK_CODE = Deno.env.get("WELCOME_CODE") ?? "WELCOME5";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -23,12 +21,13 @@ Deno.serve(async (req) => {
 
     // Only send the welcome email once per address
     if (!existing?.welcome_sent_at) {
-      // Their own one-use code (falls back to the shared code if Stripe is unavailable)
-      let code = FALLBACK_CODE, expiresAt: Date | null = null;
+      // Their own one-use code. There's no shared fallback code: if Stripe can't make one right now,
+      // the welcome email goes without it and Admin > Email > Welcome codes can send it later.
+      let code = "", expiresAt: Date | null = null;
       try {
         ({ code, expiresAt } = await createWelcomeCode(email));
         await db.from("customers").update({ welcome_code: code, welcome_code_expires_at: expiresAt.toISOString() }).eq("email", email);
-      } catch (e) { console.error("welcome code failed, using fallback", e); }
+      } catch (e) { console.error("welcome code failed — send it later from Admin > Email", e); }
       const { subject, html } = welcomeEmail({ name: cleanName, code, percent: PERCENT, expiresAt, shopUrl: SITE_URL, logoUrl: LOGO_URL });
       try {
         await sendMarketing(email, cleanName, subject, html, ["welcome"]);

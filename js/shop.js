@@ -259,7 +259,7 @@
     try {
       const res = await Store.subscribe(f.get("email").trim(), (f.get("name") || "").trim(), f.get("website") || "");
       $("#signupMsg").textContent = res && res.demo
-        ? `You're on the list. (Demo mode — no email sent. Your code would be ${C.welcomeCode}.)`
+        ? `You're on the list. (Demo mode — no email sent.)`
         : res && res.already ? "You're already on the list — thanks!" : `You're on the list. Check your inbox for ${C.welcomePercent}% off.`;
       e.target.reset(); $("#consent").checked = false;
     } catch (err) { $("#signupMsg").textContent = err.message; }
