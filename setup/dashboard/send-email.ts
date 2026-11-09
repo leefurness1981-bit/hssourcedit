@@ -228,12 +228,13 @@ function orderConfirmedEmail({ orderId, name, items, total, address, shopUrl, lo
 }
 
 const CARRIERS = {
-  "Royal Mail": (n) => `https://www.royalmail.com/track-your-item#/tracking-results/${encodeURIComponent(n)}`,
+  // Royal Mail's own recommended link format (royalmail.com › linking our website): opens with the number filled in
+  "Royal Mail": (n) => `https://www.royalmail.com/portal/rm/track?trackNumber=${encodeURIComponent(n)}`,
   "Evri": (n) => `https://www.evri.com/track/parcel/${encodeURIComponent(n)}`,
   "DPD": (n) => `https://track.dpd.co.uk/parcels/${encodeURIComponent(n)}`,
   "DHL": (n) => `https://www.dhl.com/gb-en/home/tracking.html?tracking-id=${encodeURIComponent(n)}`,
   "UPS": (n) => `https://www.ups.com/track?tracknum=${encodeURIComponent(n)}`,
-  "Parcelforce": (n) => `https://www.parcelforce.com/track-trace?trackNumber=${encodeURIComponent(n)}`,
+  "Parcelforce": (n) => `https://www.parcelforce.com/portal/pw/track?trackNumber=${encodeURIComponent(n)}`,
   "Yodel": (n) => `https://www.yodel.co.uk/tracking/${encodeURIComponent(n)}`,
 };
 const CARRIER_NAMES = [...Object.keys(CARRIERS), "Other"];
