@@ -244,7 +244,7 @@
     const st = $("#orderFilter").value;
     const list = orders.filter(o => !st || o.status === st);
     $("#ordersTable").innerHTML = `<thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th>Tracking</th></tr></thead><tbody>` +
-      (list.length ? list.map(o => `<tr>
+      (list.length ? list.map(o => `<tr data-row="${esc(o.id)}">
         <td><strong>${esc(o.id)}</strong>${o.offer_token ? `<div><span class="pill on">Friends & family</span></div>` : ""}</td><td>${fmtDate(o.created_at)}</td>
         <td>${esc(o.customer_name || "")}<div class="small">${esc(o.customer_email)}</div>${o.shipping_address ? `<div class="small">${esc(o.shipping_address)}</div>` : ""}</td>
         <td>${(o.items || []).map(i => `${i.qty}× ${esc(i.name)} <span class="small">(${esc(i.size)})</span>${i.backorder ? ` <span class="pill wait">pre-order · ${esc(i.lead_time || "")}</span>` : ""}`).join("<br>")}</td>
@@ -320,10 +320,25 @@
     f.elements.tags.value = (c.tags || []).join(", ");
     f.elements.marketing_opt_in.checked = !!c.marketing_opt_in;
     const theirs = orders.filter(o => o.customer_email === c.email);
-    $("#custOrders").innerHTML = theirs.length ? theirs.map(o => `<div class="mini"><span>${esc(o.id)} · ${fmtDate(o.created_at)}</span><span>${money(o.total)} <span class="pill ${o.status}">${o.status}</span></span></div>`).join("") : "No orders yet.";
+    $("#custOrders").innerHTML = theirs.length ? theirs.map(o => `<button type="button" class="mini mini-link" data-goto="${esc(o.id)}"><span>${esc(o.id)} · ${fmtDate(o.created_at)}</span><span>${money(o.total)} <span class="pill ${o.status}">${o.status}</span> ›</span></button>`).join("") : "No orders yet.";
     $("#deleteCustomer").hidden = !c.email;
     open("#custEditor");
   }
+  // Click an order in a customer's history → jump to it on the Orders tab
+  function showTab(tab) {
+    $$("#tabs button").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+    $$("[data-panel]").forEach(p => (p.hidden = p.dataset.panel !== tab));
+  }
+  function goToOrder(id) {
+    close("#custEditor");
+    showTab("orders");
+    $("#orderFilter").value = ""; renderOrders();
+    const row = $$("#ordersTable tr[data-row]").find(r => r.dataset.row === id);
+    if (!row) return toast("Couldn't find that order");
+    row.scrollIntoView({ behavior: "smooth", block: "center" });
+    row.classList.remove("flash"); void row.offsetWidth; row.classList.add("flash");
+  }
+  $("#custOrders").addEventListener("click", e => { const b = e.target.closest("[data-goto]"); if (b) goToOrder(b.dataset.goto); });
   $("#custForm").onsubmit = async e => {
     e.preventDefault(); const f = e.target;
     const existing = customers.find(x => x.email === f.dataset.email) || {};

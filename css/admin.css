@@ -103,3 +103,9 @@ button.link { text-decoration: underline; color: var(--muted); }
 .copy-link { font-size: .75rem; text-decoration: underline; color: var(--muted); margin-left: .4rem; }
 /* Pre-order label on order lines: a rounded tag that wraps neatly on narrow screens (no circles) */
 .pill.wait { display: table; margin: .3rem 0 .5rem; border-radius: 6px; background: #bdbdbd; color: #000; line-height: 1.35; white-space: normal; max-width: 100%; }
+/* Customer order history rows link to the order */
+.mini-link { width: 100%; background: none; border: 0; border-bottom: 1px solid var(--line); color: inherit; font: inherit; text-align: left; cursor: pointer; align-items: center; }
+.mini-link:hover, .mini-link:focus-visible { color: #fff; background: #1c1c1c; }
+#ordersTable tr.flash td { animation: rowflash 2.4s ease-out; }
+@keyframes rowflash { 0%, 40% { background: #3a3a3a; } 100% { background: transparent; } }
+.mini-link > span:last-child { white-space: nowrap; }
