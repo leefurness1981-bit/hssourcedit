@@ -88,9 +88,11 @@
   // ---------- dashboard ----------
   function renderDashboard() {
     const paid = orders.filter(o => o.status !== "refunded");
-    const revenue = paid.reduce((a, o) => a + Number(o.total), 0);
+    // Money kept: refunded orders count as £0, part refunds are taken off
+    const net = o => o.status === "refunded" ? 0 : Math.max(0, Number(o.total) - Number(o.refunded_amount || 0));
+    const revenue = paid.reduce((a, o) => a + net(o), 0);
     const month = new Date().toISOString().slice(0, 7);
-    const monthRev = paid.filter(o => o.created_at.startsWith(month)).reduce((a, o) => a + Number(o.total), 0);
+    const monthRev = paid.filter(o => o.created_at.startsWith(month)).reduce((a, o) => a + net(o), 0);
     const units = products.reduce((a, p) => a + totalStock(p), 0);
     const subs = customers.filter(c => c.marketing_opt_in).length;
     const toShip = orders.filter(o => o.status === "paid" || o.status === "packed").length;
@@ -315,7 +317,7 @@
     const list = orders.filter(o => (!st || (st === "toship" ? (o.status === "paid" || o.status === "packed") : o.status === st)) && (!term || term.split(/\s+/).every(w => text(o).includes(w))));
     $("#ordersTable").innerHTML = `<thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Items</th><th>Total</th><th>Status</th><th>Tracking</th></tr></thead><tbody>` +
       (list.length ? list.map(o => `<tr data-row="${esc(o.id)}" class="oc">
-        <td class="oc-head"><strong>${esc(o.id)}</strong><span class="oc-date">${fmtDate(o.created_at)}</span><span class="oc-total">${money(o.total)}</span>${o.offer_token ? `<div><span class="pill on">Friends & family</span></div>` : ""}</td><td class="oc-hide">${fmtDate(o.created_at)}</td>
+        <td class="oc-head"><strong>${esc(o.id)}</strong><span class="oc-date">${fmtDate(o.created_at)}</span><span class="oc-total">${money(o.total)}${Number(o.refunded_amount) > 0 && o.status !== "refunded" ? ` <span class="small">(£${Number(o.refunded_amount).toFixed(2)} refunded)</span>` : ""}</span>${o.offer_token ? `<div><span class="pill on">Friends & family</span></div>` : ""}</td><td class="oc-hide">${fmtDate(o.created_at)}</td>
         <td class="oc-cust">${esc(o.customer_name || "")}<div class="small">${esc(o.customer_email)}</div>${o.shipping_address ? `<div class="small">${esc(o.shipping_address)}</div>` : ""}${o.customer_email ? `<button type="button" class="email-cust" data-msg="${esc(o.id)}">✉ Message customer</button>` : ""}${msgsForOrder(o.id).length ? `<button type="button" class="msg-count" data-msg="${esc(o.id)}">💬 ${msgsForOrder(o.id).length} message${msgsForOrder(o.id).length === 1 ? "" : "s"} · view</button>` : ""}</td>
         <td class="oc-items">${(o.items || []).map(i => `<div class="oc-item">${i.qty}× ${esc(i.name)} <span class="small">(${esc(i.size)})</span>${i.backorder ? ` <span class="pill wait">${esc(i.lead_time || "Out of stock")}</span>` : ""}</div>`).join("")}</td>
         <td class="oc-hide">${money(o.total)}</td>
@@ -553,7 +555,7 @@
     name: ["name", v => v], allow_backorder: ["ordering when out of stock", onoff], active: ["on the site", v => (v ? "shown" : "hidden")],
     status: ["status", v => v], carrier: ["courier", v => v || "—"], tracking_number: ["tracking", v => v || "—"],
     marketing_opt_in: ["marketing", onoff], tags: ["tags", v => (v || []).join(", ") || "none"], phone: ["phone", v => v || "—"],
-    order_count: ["orders", v => v], total_spent: ["total spent", gbp], welcome_code: ["welcome code", v => v || "—"],
+    order_count: ["orders", v => v], total_spent: ["total spent", gbp], refunded_amount: ["refunded", gbp], welcome_code: ["welcome code", v => v || "—"],
     title: ["title", v => v], published: ["on the site", v => (v ? "shown" : "hidden")], max_qty: ["max items", v => v],
     expires_at: ["expires", v => (v ? fmtDate(v) : "never")]
   };

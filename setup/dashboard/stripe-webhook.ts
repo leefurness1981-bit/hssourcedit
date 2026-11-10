@@ -461,5 +461,26 @@ Deno.serve(async (req) => {
    }
   }
 
+  // Refund made in the Stripe dashboard → mark the order (full refund = status "refunded")
+  if (event.type === "charge.refunded") {
+    try {
+      const ch = event.data.object as Stripe.Charge;
+      const pi = typeof ch.payment_intent === "string" ? ch.payment_intent : ch.payment_intent?.id;
+      if (!pi) return new Response("no payment intent");
+      const sessions = await stripe.checkout.sessions.list({ payment_intent: pi, limit: 1 });
+      const sid = sessions.data[0]?.id;
+      const { data: order } = sid ? await db.from("orders").select("id,total,status").eq("stripe_session_id", sid).maybeSingle() : { data: null };
+      if (!order) { console.log("Refund for a payment with no shop order", pi); return new Response("no matching order"); }
+      const refunded = (ch.amount_refunded ?? 0) / 100;
+      const full = ch.refunded || refunded >= Number(order.total);
+      await db.from("orders").update({ refunded_amount: refunded, ...(full ? { status: "refunded" } : {}) }).eq("id", order.id);
+      await logEvent("orders", order.id, order.id, full ? `Refunded in full in Stripe (£${refunded.toFixed(2)})` : `Part refund in Stripe: £${refunded.toFixed(2)} of £${Number(order.total).toFixed(2)}`);
+      console.log("Refund recorded", order.id, refunded, full ? "full" : "partial");
+    } catch (e) {
+      console.error("Refund processing failed:", e);
+      return new Response("error: " + (e as Error).message, { status: 500 });
+    }
+  }
+
   return new Response("ok");
 });

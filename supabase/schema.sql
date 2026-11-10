@@ -290,3 +290,4 @@ begin
     execute format('create trigger audit_%1$s after insert or update or delete on %1$I for each row execute function audit_row()', t);
   end loop;
 end $$;
+alter table orders add column if not exists refunded_amount numeric(10,2) not null default 0;
