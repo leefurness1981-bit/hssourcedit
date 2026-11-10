@@ -256,6 +256,8 @@
     e.preventDefault();
     const f = new FormData(e.target);
     if (!$("#consent").checked) { $("#signupMsg").textContent = "Tick the box so we can email you."; return; }
+    const btn = e.target.querySelector("button[type=submit], button:not([type])");
+    if (btn) { if (btn.disabled) return; btn.disabled = true; }
     try {
       const res = await Store.subscribe(f.get("email").trim(), (f.get("name") || "").trim(), f.get("website") || "");
       $("#signupMsg").textContent = res && res.demo
@@ -263,6 +265,7 @@
         : res && res.already ? "You're already on the list — thanks!" : `You're on the list. Check your inbox for ${C.welcomePercent}% off.`;
       e.target.reset(); $("#consent").checked = false;
     } catch (err) { $("#signupMsg").textContent = err.message; }
+    finally { if (btn) btn.disabled = false; }
   };
 
   // ---------- checkout return ----------

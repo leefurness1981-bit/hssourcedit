@@ -426,8 +426,11 @@ Deno.serve(async (req) => {
     if (error) throw error;
     await syncBrevoContact(email, cleanName, true);
 
-    // Only send the welcome email once per address
-    if (!existing?.welcome_sent_at) {
+    // Only send the welcome email once per address. Claim it atomically first, so a double-tap
+    // (two sign-ups arriving at the same moment) can't create two codes or send two emails.
+    const { data: claimed } = existing?.welcome_sent_at ? { data: [] } : await db.from("customers")
+      .update({ welcome_sent_at: new Date().toISOString() }).eq("email", email).is("welcome_sent_at", null).select("email");
+    if (claimed && claimed.length) {
       // Their own one-use code. There's no shared fallback code: if Stripe can't make one right now,
       // the welcome email goes without it and asks them to reply for their code.
       let code = "", expiresAt: Date | null = null;
@@ -441,8 +444,10 @@ Deno.serve(async (req) => {
       const { subject, html } = welcomeEmail({ name: cleanName, code, percent: PERCENT, expiresAt, shopUrl: SITE_URL, logoUrl: LOGO_URL });
       try {
         await sendMarketing(email, cleanName, subject, html, ["welcome"]);
-        await db.from("customers").update({ welcome_sent_at: new Date().toISOString() }).eq("email", email);
-      } catch (e) { console.error("welcome email failed", e); }
+      } catch (e) {
+        console.error("welcome email failed", e);
+        await db.from("customers").update({ welcome_sent_at: null }).eq("email", email); // allow a retry
+      }
     }
     return json({ ok: true, already: !!existing?.marketing_opt_in });
   } catch (e) {

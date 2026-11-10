@@ -581,7 +581,9 @@
           if (x === y) return;
           parts.push(x == null ? `added size ${sz} (${y})` : y == null ? `removed size ${sz}` : `${sz} stock ${x} → ${y}`);
         });
-      } else if (k === "image") parts.push("photo changed");
+      } else if (k === "welcome_sent_at") { if (to) parts.push("welcome email sent"); }
+      else if (k === "welcome_code_failed_at") { if (to) parts.push("welcome code didn't generate"); }
+      else if (k === "image") parts.push("photo changed");
       else if (k === "description") parts.push("description edited");
       else if (k === "notes") parts.push("notes edited");
       else if (k === "body") parts.push("wording edited");
