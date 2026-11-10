@@ -39,7 +39,14 @@
   };
   $("#signOut").onclick = async () => { await Store.signOut(); location.reload(); };
 
+  // Keep the admin up to date without a page refresh: reload when you switch tabs or come back
+  // to the page (at most every 15 seconds), so new orders and sign-ups appear.
+  let lastLoad = 0;
+  function refreshSoon() { if (Date.now() - lastLoad > 15000 && !$$(".overlay").some(o => !o.hidden)) loadAll(); }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshSoon(); });
+  window.addEventListener("focus", refreshSoon);
   async function loadAll() {
+    lastLoad = Date.now();
     try {
       [products, orders, customers, campaigns] = await Promise.all([
         Store.getProducts({ includeInactive: true }), Store.getOrders(), Store.getCustomers(), Store.getCampaigns()
@@ -64,6 +71,7 @@
     $$("[data-panel]").forEach(p => (p.hidden = p.dataset.panel !== tab));
     window.scrollTo(0, 0);
     if (tab === "settings") loadTermsEditor();
+    if (["dashboard", "orders", "customers", "stock", "email"].includes(tab)) refreshSoon();
     if (tab === "activity") loadActivity(true);
   }
   function goTab(tab) {
