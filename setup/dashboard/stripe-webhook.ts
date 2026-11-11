@@ -186,7 +186,7 @@ function p(text, extra = "") {
 
 function itemsTable(items, total) {
   const rows = (items || []).map((i) => `<tr>
-      <td style="padding:10px 0;border-bottom:1px solid ${C.line};font-family:${C.font};font-size:14px;color:${C.text}">${esc(i.qty)}× ${esc(i.name)}<br><span style="color:${C.muted};font-size:12px">Size ${esc(i.size)}</span>${i.backorder ? `<br><span style="color:${C.text};font-size:12px;font-weight:bold">Ships in ${esc(i.lead_time || "5–8 business days")}</span>` : ""}</td>
+      <td style="padding:10px 0;border-bottom:1px solid ${C.line};font-family:${C.font};font-size:14px;color:${C.text}">${esc(i.qty)}× ${esc(i.name)}<br><span style="color:${C.muted};font-size:12px">${/^Top /.test(i.size || "") ? "" : "Size "}${esc(i.size)}</span>${i.backorder ? `<br><span style="color:${C.text};font-size:12px;font-weight:bold">Ships in ${esc(i.lead_time || "5–8 business days")}</span>` : ""}</td>
       <td align="right" style="padding:10px 0;border-bottom:1px solid ${C.line};font-family:${C.font};font-size:14px;color:${C.text};white-space:nowrap">${money(i.price * i.qty)}</td></tr>`).join("");
   const tot = total != null ? `<tr><td style="padding:12px 0 0;font-family:${C.font};font-size:15px;font-weight:bold;color:${C.text}">Total paid</td>
       <td align="right" style="padding:12px 0 0;font-family:${C.font};font-size:15px;font-weight:bold;color:${C.text}">${money(total)}</td></tr>` : "";
@@ -380,7 +380,10 @@ Deno.serve(async (req) => {
     if (exErr) throw new Error("Reading orders failed: " + exErr.message);
     if (existing) { console.log("Already processed", existing.id); return new Response("already processed"); }
 
-    const meta: { id: string; size: string; qty: number; b?: number }[] = JSON.parse(s.metadata?.items ?? "[]");
+    // The bag can be spread over items, items_1, items_2… (Stripe's 500-character limit per value)
+    let itemsStr = s.metadata?.items ?? "[]";
+    for (let i = 1; s.metadata?.[`items_${i}`]; i++) itemsStr += s.metadata[`items_${i}`];
+    const meta: { id: string; size: string; qty: number; b?: number }[] = JSON.parse(itemsStr);
     const offerToken = s.metadata?.offer || null;
     let offerPrice: number | null = null;
     if (offerToken) {
@@ -398,8 +401,12 @@ Deno.serve(async (req) => {
     });
 
     for (const m of meta) {
-      const { error } = await db.rpc("decrement_stock", { p_id: m.id, p_size: m.size, p_qty: m.qty });
-      if (error) console.error("Stock update failed", m, error.message);
+      // Tracksuit with separate sizes: "Top M / Bottoms L" takes one from each
+      const split = /^Top (.+) \/ Bottoms (.+)$/.exec(m.size);
+      for (const key of split ? ["Top " + split[1], "Bottoms " + split[2]] : [m.size]) {
+        const { error } = await db.rpc("decrement_stock", { p_id: m.id, p_size: key, p_qty: m.qty });
+        if (error) console.error("Stock update failed", m, key, error.message);
+      }
     }
 
     const email = (s.customer_details?.email ?? "").toLowerCase();

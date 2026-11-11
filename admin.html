@@ -7,8 +7,8 @@
   <title>HS Sourced It — Admin</title>
   <link rel="icon" href="images/favicon.png">
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Source+Serif+4:opsz,wght@8..60,900&family=Archivo:wght@400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=202611101543">
-  <link rel="stylesheet" href="css/admin.css?v=202611101543">
+  <link rel="stylesheet" href="css/style.css?v=202611111504">
+  <link rel="stylesheet" href="css/admin.css?v=202611111504">
 </head>
 <body class="admin">
   <!-- Login -->
@@ -187,8 +187,15 @@
       </div>
       <h3>Sizes & stock</h3>
       <div class="size-presets"><button type="button" class="chip" data-preset="shoe">UK shoe sizes</button><button type="button" class="chip" data-preset="clothing">XS–XXL</button><button type="button" class="chip" data-preset="one">One size</button></div>
+      <label class="check"><input type="checkbox" id="splitSizes"> Top and bottoms sized separately (tracksuits) — customers pick each size, same price</label>
+      <h4 class="split-head" id="topHead" hidden>Top sizes</h4>
       <div id="sizeRows" class="size-rows"></div>
       <button type="button" class="small" id="addSize">+ Add size</button>
+      <div id="bottomBox" hidden>
+        <h4 class="split-head">Bottoms sizes</h4>
+        <div id="sizeRowsB" class="size-rows"></div>
+        <button type="button" class="small" id="addSizeB">+ Add bottoms size</button>
+      </div>
       <div class="row-btns"><button type="button" class="btn btn-ghost danger" id="deleteProduct">Delete</button><button class="btn btn-accent">Save product</button></div>
 
       <div class="offer-box" id="offerBox">
@@ -274,12 +281,12 @@
 
   <div class="toast" id="toast"></div>
 
-  <script src="js/config.js?v=202611101543"></script>
+  <script src="js/config.js?v=202611111504"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/data.js?v=202611101543"></script>
-  <script src="js/markdown.js?v=202611101543"></script>
-  <script src="js/default-pages.js?v=202611101543"></script>
-  <script src="js/admin.js?v=202611101543"></script>
+  <script src="js/data.js?v=202611111504"></script>
+  <script src="js/markdown.js?v=202611111504"></script>
+  <script src="js/default-pages.js?v=202611111504"></script>
+  <script src="js/admin.js?v=202611111504"></script>
   <script type="module">
     import * as T from "./supabase/functions/_shared/templates.js";
     window.EMAIL_T = T;

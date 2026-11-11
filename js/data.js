@@ -272,13 +272,13 @@
       for (const line of cart) {
         const p = products.find(x => x.id === line.id);
         if (!p) throw new Error(`Sorry — ${line.name} is no longer available.`);
-        if (p.allow_backorder === false && (p.sizes[line.size] || 0) < line.qty) throw new Error(`Sorry — ${line.name} (${line.size}) just sold out.`);
+        if (p.allow_backorder === false && window.KERB.stockOf(p, line.size) < line.qty) throw new Error(`Sorry — ${line.name} (${line.size}) just sold out.`);
       }
       let total = 0;
       for (const line of cart) {
         const p = products.find(x => x.id === line.id);
-        const have = Math.max(0, p.sizes[line.size] || 0);
-        p.sizes[line.size] = Math.max(0, have - line.qty);
+        const have = window.KERB.stockOf(p, line.size);
+        (window.KERB.parseSplit(line.size) || [line.size]).forEach(k => { p.sizes[k] = Math.max(0, (p.sizes[k] || 0) - line.qty); });
         total += p.price * line.qty;
         const pre = line.qty > have;
         items.push({ id: p.id, name: p.name, size: line.size, qty: line.qty, price: p.price, ...(pre ? { backorder: true, lead_time: (p.lead_time || "5–8 business days") } : {}) });
@@ -410,7 +410,18 @@
   const DEFAULT_LEAD_TIME = "5–8 business days";
   const canPreorder = p => p.allow_backorder !== false;
   const leadTime = p => (p.lead_time || "").trim() || DEFAULT_LEAD_TIME;
-  const stockOf = (p, size) => Math.max(0, Number((p.sizes || {})[size] || 0));
+  // Tracksuits can have the top and bottoms sized separately. Their stock is kept under
+  // "Top M", "Bottoms L"… and a bag line's size reads "Top M / Bottoms L" (one product, one price).
+  const TOP = "Top ", BOT = "Bottoms ";
+  const isSplit = p => { const k = Object.keys(p.sizes || {}); return k.some(x => x.startsWith(TOP)) && k.some(x => x.startsWith(BOT)); };
+  const splitEntries = p => ({
+    top: sortSizes(Object.entries(p.sizes || {}).filter(([k]) => k.startsWith(TOP)).map(([k, n]) => [k.slice(TOP.length), n])),
+    bottom: sortSizes(Object.entries(p.sizes || {}).filter(([k]) => k.startsWith(BOT)).map(([k, n]) => [k.slice(BOT.length), n])),
+  });
+  const splitSize = (top, bottom) => `${TOP}${top} / ${BOT}${bottom}`;
+  const parseSplit = size => { const m = /^Top (.+) \/ Bottoms (.+)$/.exec(String(size)); return m ? [TOP + m[1], BOT + m[2]] : null; };
+  const rawStock = (p, key) => Math.max(0, Number((p.sizes || {})[key] || 0));
+  const stockOf = (p, size) => { const k = parseSplit(size); return k ? Math.min(rawStock(p, k[0]), rawStock(p, k[1])) : rawStock(p, size); };
   const maxQty = (p, size) => (canPreorder(p) ? 10 : stockOf(p, size));
   // Delivery: free with N+ items, otherwise one delivery charge = the highest delivery cost of the items in the bag
   const shipCostOf = p => (p && p.shipping_cost != null && p.shipping_cost !== "" ? Number(p.shipping_cost) : C.shippingCost);
@@ -431,10 +442,13 @@
     const n = parseFloat(String(s).replace(/[^0-9.]/g, ""));
     return isNaN(n) ? [2, 0] : [1, n];
   }
+  // Tracksuit stock ("Top M", "Bottoms L"): all tops first, then all bottoms, each small to large
+  const partOf = s => /^Top /.test(s) ? [1, s.slice(4)] : /^Bottoms /.test(s) ? [2, s.slice(8)] : [0, s];
   const sortSizes = list => [...list].sort((a, b) => {
-    const ka = sizeRank(Array.isArray(a) ? a[0] : a), kb = sizeRank(Array.isArray(b) ? b[0] : b);
-    return ka[0] - kb[0] || ka[1] - kb[1] || String(a).localeCompare(String(b));
+    const [ga, sa] = partOf(String(Array.isArray(a) ? a[0] : a)), [gb, sb] = partOf(String(Array.isArray(b) ? b[0] : b));
+    const ka = sizeRank(sa), kb = sizeRank(sb);
+    return ga - gb || ka[0] - kb[0] || ka[1] - kb[1] || String(a).localeCompare(String(b));
   });
   const sizeEntries = p => sortSizes(Object.entries(p.sizes || {}));
-  window.KERB = { sortSizes, sizeEntries, money, esc, fallbackImg, imgTag, totalStock, DEFAULT_LEAD_TIME, canPreorder, leadTime, stockOf, maxQty, shipCostOf, deliveryFor };
+  window.KERB = { sortSizes, sizeEntries, isSplit, splitEntries, splitSize, parseSplit, money, esc, fallbackImg, imgTag, totalStock, DEFAULT_LEAD_TIME, canPreorder, leadTime, stockOf, maxQty, shipCostOf, deliveryFor };
 })();

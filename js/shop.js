@@ -1,6 +1,6 @@
 (function () {
   const C = window.SHOP_CONFIG;
-  const { sizeEntries, money, esc, imgTag, totalStock, canPreorder, leadTime, stockOf, maxQty, shipCostOf, deliveryFor } = window.KERB;
+  const { sizeEntries, isSplit, splitEntries, splitSize, money, esc, imgTag, totalStock, canPreorder, leadTime, stockOf, maxQty, shipCostOf, deliveryFor } = window.KERB;
   const FREE_N = C.freeShippingMinItems;
   const $ = s => document.querySelector(s);
   const $$ = s => [...document.querySelectorAll(s)];
@@ -52,11 +52,34 @@
     }).join("");
   }
 
+  // ---------- size picker (one row, or separate Top / Bottoms rows for tracksuits) ----------
+  function sizeButtons(p, entries, part) {
+    return entries.map(([s, n]) => `<button class="size ${n > 0 ? "" : "pre"}" data-part="${part}" data-size="${esc(s)}" ${n > 0 || canPreorder(p) ? "" : "disabled"} title="${n > 0 ? "In stock" : canPreorder(p) ? "Ships in " + esc(leadTime(p)) : "Sold out"}">${esc(s)}</button>`).join("");
+  }
+  function sizePickerHtml(p) {
+    if (!isSplit(p)) return `<div><p class="small" style="margin-bottom:.5rem">SELECT SIZE</p><div class="sizes">${sizeButtons(p, sizeEntries(p), "one")}</div></div>`;
+    const { top, bottom } = splitEntries(p);
+    return `<div><p class="small" style="margin-bottom:.5rem">TOP SIZE</p><div class="sizes">${sizeButtons(p, top, "top")}</div></div>
+      <div><p class="small" style="margin-bottom:.5rem">BOTTOMS SIZE</p><div class="sizes">${sizeButtons(p, bottom, "bottom")}</div></div>
+      <p class="small">Pick the top and bottoms in different sizes if you like — same price.</p>`;
+  }
+  // Calls onPick(size) once a size (or both tracksuit sizes) is chosen, onPick(null) while waiting for the second
+  function wireSizes(p, onPick) {
+    const pick = {};
+    $$("#productBody .size").forEach(b => b.onclick = () => {
+      const part = b.dataset.part;
+      $$(`#productBody .size[data-part="${part}"]`).forEach(x => x.classList.remove("sel"));
+      b.classList.add("sel"); pick[part] = b.dataset.size;
+      if (part === "one") return onPick(pick.one);
+      onPick(pick.top && pick.bottom ? splitSize(pick.top, pick.bottom) : null, pick);
+    });
+  }
+  const waitText = (p, pick) => isSplit(p) ? (pick && pick.top ? "Now pick the bottoms size" : pick && pick.bottom ? "Now pick the top size" : "Select sizes") : "Select a size";
+
   // ---------- product modal ----------
   function openProduct(id) {
     const p = products.find(x => x.id === id); if (!p) return;
     let selected = null;
-    const sizes = sizeEntries(p);
     $("#productBody").innerHTML = `<div class="pm">
       <div class="pm-img">${imgTag(p.image, p.name)}</div>
       <div class="pm-info">
@@ -65,18 +88,17 @@
         <div class="pm-price-row"><div class="pm-price">${money(p.price)}</div><button type="button" class="share-btn" id="shareBtn">Share ↗</button></div>
         <p class="small">Delivery ${shipCostOf(p) > 0 ? money(shipCostOf(p)) : "free"} · free when you order ${FREE_N}+ items</p>
         <p class="pm-desc">${esc(p.description)}</p>
-        <div><p class="small" style="margin-bottom:.5rem">SELECT SIZE</p>
-          <div class="sizes">${sizes.map(([s, n]) => `<button class="size ${n > 0 ? "" : "pre"}" data-size="${esc(s)}" ${n > 0 || canPreorder(p) ? "" : "disabled"} title="${n > 0 ? "In stock" : canPreorder(p) ? "Ships in " + esc(leadTime(p)) : "Sold out"}">${esc(s)}</button>`).join("")}</div></div>
+        ${sizePickerHtml(p)}
         <div class="stock-note" id="stockNote"></div>
-        <button class="btn btn-accent btn-block" id="addBtn" disabled>Select a size</button>
+        <button class="btn btn-accent btn-block" id="addBtn" disabled>${waitText(p)}</button>
       </div></div>`;
     $("#shareBtn").onclick = () => shareProduct(p);
-    $$("#productBody .size").forEach(b => b.onclick = () => {
-      $$("#productBody .size").forEach(x => x.classList.remove("sel"));
-      b.classList.add("sel"); selected = b.dataset.size;
-      const n = stockOf(p, selected);
+    wireSizes(p, (size, pick) => {
+      selected = size;
+      if (!size) { $("#stockNote").textContent = ""; $("#addBtn").disabled = true; $("#addBtn").textContent = waitText(p, pick); return; }
+      const n = stockOf(p, size);
       $("#stockNote").textContent = n <= 0 ? `Ships in ${leadTime(p)}`
-        : n <= C.lowStockThreshold ? `Only ${n} left in ${selected}` : "In stock";
+        : n <= C.lowStockThreshold ? `Only ${n} left in ${isSplit(p) ? "those sizes" : size}` : "In stock";
       $("#addBtn").disabled = false; $("#addBtn").textContent = "Add to bag — " + money(p.price);
     });
     $("#addBtn").onclick = () => { addToCart(p, selected); close("#productOverlay"); };
@@ -103,7 +125,6 @@
   }
   function openOffer(o) {
     const p = o.product; let selected = null;
-    const sizes = sizeEntries(p);
     const qtyPicker = o.max_qty > 1
       ? `<label class="small">Quantity <select id="offerQty">${Array.from({ length: o.max_qty }, (_, i) => `<option>${i + 1}</option>`).join("")}</select></label>` : "";
     $("#productBody").innerHTML = `<div class="pm">
@@ -113,18 +134,16 @@
         <h2>${esc(p.name)}</h2>
         <div class="pm-price">${money(o.price)} ${Number(p.price) > o.price ? `<span class="was">${money(p.price)}</span>` : ""}</div>
         <p class="pm-desc">${esc(p.description || "")}</p>
-        <div><p class="small" style="margin-bottom:.5rem">SELECT SIZE</p>
-          <div class="sizes">${sizes.map(([s, n]) => `<button class="size ${n > 0 ? "" : "pre"}" data-size="${esc(s)}" ${n > 0 || canPreorder(p) ? "" : "disabled"}>${esc(s)}</button>`).join("")}</div></div>
+        ${sizePickerHtml(p)}
         ${qtyPicker}
         <div class="stock-note" id="stockNote"></div>
-        <button class="btn btn-accent btn-block" id="addBtn" disabled>Select a size</button>
+        <button class="btn btn-accent btn-block" id="addBtn" disabled>${waitText(p)}</button>
         <p class="small">This price is personal to you and works for one order${o.max_qty > 1 ? ` (up to ${o.max_qty} items)` : ""}. It can't be combined with other discount codes.</p>
       </div></div>`;
-    $$("#productBody .size").forEach(b => b.onclick = () => {
-      $$("#productBody .size").forEach(x => x.classList.remove("sel"));
-      b.classList.add("sel"); selected = b.dataset.size;
-      const n = stockOf(p, selected);
-      $("#stockNote").textContent = n <= 0 ? `Ships in ${leadTime(p)}` : "In stock";
+    wireSizes(p, (size, pick) => {
+      selected = size;
+      if (!size) { $("#stockNote").textContent = ""; $("#addBtn").disabled = true; $("#addBtn").textContent = waitText(p, pick); return; }
+      $("#stockNote").textContent = stockOf(p, size) <= 0 ? `Ships in ${leadTime(p)}` : "In stock";
       $("#addBtn").disabled = false; $("#addBtn").textContent = "Buy now — " + money(o.price);
     });
     $("#addBtn").onclick = async () => {
@@ -176,7 +195,7 @@
     const { sub, ship, total, count } = totals();
     $("#cartItems").innerHTML = cart.length ? cart.map((l, i) => `<div class="line">
         ${imgTag(l.image, l.name)}
-        <div><h4>${esc(l.name)}</h4><div class="small">Size ${esc(l.size)}</div>${preNote(l)}
+        <div><h4>${esc(l.name)}</h4><div class="small">${/^Top /.test(l.size) ? "" : "Size "}${esc(l.size)}</div>${preNote(l)}
           <div class="qty"><button data-dec="${i}" aria-label="Decrease">−</button><span>${l.qty}</span><button data-inc="${i}" aria-label="Increase">+</button></div>
           <button class="remove" data-rm="${i}">Remove</button></div>
         <strong>${money(l.price * l.qty)}</strong></div>`).join("")

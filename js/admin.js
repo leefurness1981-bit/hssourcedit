@@ -1,6 +1,6 @@
 (function () {
   const C = window.SHOP_CONFIG;
-  const { sizeEntries, money, esc, imgTag, totalStock } = window.KERB;
+  const { sizeEntries, isSplit, splitEntries, money, esc, imgTag, totalStock } = window.KERB;
   const $ = s => document.querySelector(s);
   const $$ = s => [...document.querySelectorAll(s)];
   let products = [], orders = [], customers = [], campaigns = [], offers = [], messages = [];
@@ -170,7 +170,15 @@
     f.elements.active.checked = !!p.active;
     f.elements.allow_backorder.checked = p.allow_backorder !== false;
     f.elements.lead_time.value = p.lead_time || "5–8 business days";
-    $("#sizeRows").innerHTML = sizeEntries(p).map(([s, n]) => sizeRow(s, n)).join("");
+    if (isSplit(p)) {
+      const { top, bottom } = splitEntries(p);
+      $("#sizeRows").innerHTML = top.map(([s, n]) => sizeRow(s, n)).join("");
+      $("#sizeRowsB").innerHTML = bottom.map(([s, n]) => sizeRow(s, n)).join("");
+    } else {
+      $("#sizeRows").innerHTML = sizeEntries(p).map(([s, n]) => sizeRow(s, n)).join("");
+      $("#sizeRowsB").innerHTML = "";
+    }
+    setSplit(isSplit(p));
     $("#deleteProduct").hidden = !p.id;
     f.elements.family_price.value = p.family_price ?? "";
     f.elements.shipping_cost.value = p.shipping_cost ?? C.shippingCost;
@@ -196,13 +204,37 @@
     btn.style.opacity = 1; e.target.value = "";
   };
   $("#addSize").onclick = () => $("#sizeRows").insertAdjacentHTML("beforeend", sizeRow());
-  $("#sizeRows").addEventListener("click", e => { if (e.target.dataset.rmsize !== undefined) e.target.parentElement.remove(); });
-  $$("[data-preset]").forEach(b => b.onclick = () => ($("#sizeRows").innerHTML = PRESETS[b.dataset.preset].map(s => sizeRow(s, 0)).join("")));
+  $("#addSizeB").onclick = () => $("#sizeRowsB").insertAdjacentHTML("beforeend", sizeRow());
+  ["#sizeRows", "#sizeRowsB"].forEach(id => $(id).addEventListener("click", e => { if (e.target.dataset.rmsize !== undefined) e.target.parentElement.remove(); }));
+  $$("[data-preset]").forEach(b => b.onclick = () => {
+    const rows = PRESETS[b.dataset.preset].map(s => sizeRow(s, 0)).join("");
+    $("#sizeRows").innerHTML = rows;
+    if ($("#splitSizes").checked) $("#sizeRowsB").innerHTML = rows;
+  });
+  // Tracksuits: separate Top and Bottoms size lists (saved as "Top M", "Bottoms L"…)
+  function setSplit(on) {
+    $("#splitSizes").checked = on;
+    $("#topHead").hidden = !on; $("#bottomBox").hidden = !on;
+    $("#addSize").textContent = on ? "+ Add top size" : "+ Add size";
+  }
+  $("#splitSizes").onchange = e => {
+    // Ticking it starts the bottoms with the same sizes and stock as the top (each full set he has = one top + one bottoms)
+    if (e.target.checked && !$("#sizeRowsB").children.length)
+      $("#sizeRowsB").innerHTML = $$("#sizeRows .size-row").map(r => { const [s, n] = r.querySelectorAll("input"); return sizeRow(s.value, n.value); }).join("");
+    setSplit(e.target.checked);
+  };
   $("#productForm").onsubmit = async e => {
     e.preventDefault();
     const f = e.target;
     const sizes = {};
-    $$("#sizeRows .size-row").forEach(r => { const [s, n] = r.querySelectorAll("input"); if (s.value.trim()) sizes[s.value.trim()] = Math.max(0, parseInt(n.value || 0, 10)); });
+    const split = $("#splitSizes").checked;
+    const readRows = (sel, prefix) => $$(sel + " .size-row").forEach(r => { const [s, n] = r.querySelectorAll("input"); if (s.value.trim()) sizes[prefix + s.value.trim()] = Math.max(0, parseInt(n.value || 0, 10)); });
+    readRows("#sizeRows", split ? "Top " : "");
+    if (split) {
+      readRows("#sizeRowsB", "Bottoms ");
+      if (!Object.keys(sizes).some(k => k.startsWith("Top ")) || !Object.keys(sizes).some(k => k.startsWith("Bottoms ")))
+        return toast("Add at least one top size and one bottoms size (or untick 'sized separately').");
+    }
     const p = { ...(products.find(x => x.id === f.dataset.id) || {}), id: f.dataset.id || undefined,
       name: f.elements.name.value.trim(), category: f.elements.category.value, price: Number(f.elements.price.value),
       badge: f.elements.badge.value.trim(), image: f.elements.image.value.trim(), description: f.elements.description.value.trim(),

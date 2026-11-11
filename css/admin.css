@@ -198,3 +198,4 @@ ol.hist { list-style: none; padding: 0; margin: 0; }
 ol.hist li { padding: .55rem 0; border-bottom: 1px solid var(--line); line-height: 1.5; }
 ol.hist li:last-child { border-bottom: 0; }
 .oc-status .msg-count { margin-top: .5rem; }
+.split-head { margin: .9rem 0 .4rem; font-size: .85rem; letter-spacing: .06em; text-transform: uppercase; }

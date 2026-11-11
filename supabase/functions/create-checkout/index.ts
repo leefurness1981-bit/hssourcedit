@@ -13,6 +13,14 @@ const SITE_URL = (Deno.env.get("SITE_URL") ?? "").replace(/\/?$/, "/");
 // Product photos for Stripe's page must be full web addresses
 const imageUrl = (img: string) => img?.startsWith("http") ? img : img && !img.startsWith("data:") && SITE_URL !== "/" ? SITE_URL + img.replace(/^\/+/, "") : "";
 
+// Stripe metadata values are max 500 characters, so a long bag is spread over items, items_1, items_2…
+// (the webhook joins them back together)
+function itemsMetadata(str: string) {
+  const out: Record<string, string> = {};
+  for (let i = 0; i * 500 < str.length && i < 40; i++) out[i ? `items_${i}` : "items"] = str.slice(i * 500, i * 500 + 500);
+  return out;
+}
+
 const cors = {
   "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
   "Access-Control-Allow-Headers": "authorization, apikey, content-type",
@@ -63,24 +71,28 @@ Deno.serve(async (req) => {
       const qty = Math.max(1, Math.min(offer ? offer.max_qty : 10, parseInt(raw.qty, 10) || 1));
       const p = products!.find((x) => x.id === raw.id);
       if (!p) return json({ error: "A product in your bag is no longer available" }, 400);
-      if (!p.sizes || !(raw.size in p.sizes)) return json({ error: `Sorry — ${p.name} doesn't come in ${raw.size}` }, 400);
-      const inStock = Math.max(0, Number(p.sizes[raw.size] ?? 0));
+      // A tracksuit with separate top/bottoms sizes arrives as "Top M / Bottoms L"; both parts must exist
+      const size = String(raw.size ?? "");
+      const split = /^Top (.+) \/ Bottoms (.+)$/.exec(size);
+      const keys = split ? ["Top " + split[1], "Bottoms " + split[2]] : [size];
+      if (!p.sizes || keys.some((k) => !(k in p.sizes))) return json({ error: `Sorry — ${p.name} doesn't come in ${size}` }, 400);
+      const inStock = Math.min(...keys.map((k) => Math.max(0, Number(p.sizes[k] ?? 0))));
       const preorder = qty > inStock;
-      if (preorder && p.allow_backorder === false) return json({ error: `Sorry — ${p.name} (${raw.size}) only has ${inStock} left` }, 409);
+      if (preorder && p.allow_backorder === false) return json({ error: `Sorry — ${p.name} (${size}) only has ${inStock} left` }, 409);
       const lead = (p.lead_time || "").trim() || "5–8 business days";
       const unit = offer ? Number(offer.price) : Number(p.price);
       subtotal += unit * qty;
       itemCount += qty;
       // one delivery charge per order: the highest delivery cost of the items in it
       deliveryCost = Math.max(deliveryCost, p.shipping_cost != null ? Number(p.shipping_cost) : SHIPPING);
-      meta.push({ id: p.id, size: raw.size, qty, ...(preorder ? { b: 1 } : {}) });
+      meta.push({ id: p.id, size, qty, ...(preorder ? { b: 1 } : {}) });
       line_items.push({
         quantity: qty,
         price_data: {
           currency: CURRENCY,
           unit_amount: Math.round(unit * 100),
           product_data: {
-            name: `${p.name} — ${raw.size}${offer ? " (friends & family price)" : ""}`,
+            name: `${p.name} — ${size}${offer ? " (friends & family price)" : ""}`,
             images: imageUrl(p.image) ? [imageUrl(p.image)] : [],
             ...(preorder ? { description: inStock > 0 ? `${inStock} in stock, ${qty - inStock} ships in ${lead}` : `Ships in ${lead}` } : {}),
           },
@@ -106,7 +118,7 @@ Deno.serve(async (req) => {
           delivery_estimate: { minimum: { unit: "business_day", value: 2 }, maximum: { unit: "business_day", value: 4 } },
         },
       }],
-      metadata: { items: JSON.stringify(meta).slice(0, 500), ...(offer ? { offer: offer.token } : {}) }, // Stripe metadata values max 500 chars
+      metadata: { ...itemsMetadata(JSON.stringify(meta)), ...(offer ? { offer: offer.token } : {}) },
     });
 
     if (offer) {
