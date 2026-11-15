@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Leave a review — HS Sourced It</title>
+  <link rel="icon" href="images/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css?v=202611152223">
+  <style>
+    .rv { max-width: 640px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+    .rv-top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem; border-bottom: 1px solid #222; }
+    .rv-top img { height: 42px; }
+    .rv-top a.back { color: #fff; text-decoration: none; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: .8rem; border: 1px solid #fff; padding: .55rem 1rem; }
+    .rv h1 { font-family: Anton, Impact, sans-serif; font-weight: 400; text-transform: uppercase; font-size: clamp(2.2rem, 8vw, 3.2rem); line-height: 1; margin: 0 0 .6rem; }
+    .rv p.lead { color: #bdbdbd; margin: 0 0 1.6rem; }
+    .rv-item { display: grid; grid-template-columns: 84px 1fr; gap: 1rem; padding: 1.2rem 0; border-top: 1px solid #222; }
+    .rv-item img, .rv-item .ph { width: 84px; height: 84px; object-fit: cover; border-radius: 6px; background: #111; }
+    .rv-item h2 { font-size: 1rem; margin: 0 0 .2rem; }
+    .rv-item .sz { color: #8c8c8c; font-size: .8rem; margin-bottom: .5rem; }
+    .pick { display: flex; gap: .15rem; margin-bottom: .6rem; }
+    .pick button { background: none; border: 0; font-size: 2rem; line-height: 1; color: #444; cursor: pointer; padding: .1rem; }
+    .pick button.on { color: #f5c518; }
+    .rv textarea, .rv input[type=text] { width: 100%; box-sizing: border-box; background: #0d0d0d; color: #fff; border: 1px solid #333; border-radius: 6px; padding: .75rem; font: inherit; }
+    .rv textarea { min-height: 90px; resize: vertical; }
+    .rv label.name { display: block; margin: 1.4rem 0 1.4rem; font-weight: 700; font-size: .85rem; }
+    .rv label.name input { margin-top: .4rem; font-weight: 400; }
+    .rv .small { color: #8c8c8c; font-size: .8rem; }
+    .rv .err { color: #ff8080; min-height: 1.2em; margin: .6rem 0; }
+    .rv .done { text-align: center; padding: 2rem 0; }
+  </style>
+</head>
+<body>
+  <header class="rv-top">
+    <a href="./"><img src="images/logo.png" alt="HS Sourced It"></a>
+    <a class="back" href="./">Back to shop</a>
+  </header>
+  <main class="rv" id="main"><p>Loading…</p></main>
+
+  <script src="js/config.js?v=202611152223"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/data.js?v=202611152223"></script>
+  <script>
+    (async () => {
+      const { esc } = window.KERB, main = document.getElementById("main");
+      const token = new URLSearchParams(location.search).get("t") || "";
+      const fail = msg => { main.innerHTML = `<h1>Leave a review</h1><p class="lead">${esc(msg)}</p><p>Any questions? Email <a href="mailto:hello@hssourcedit.com" style="color:#fff">hello@hssourcedit.com</a>.</p>`; };
+      let info;
+      try { info = await Store.reviewInfo(token); } catch (e) { return fail("Couldn't load your order right now. Please try the link again shortly."); }
+      if (!info || !info.valid) return fail((info && info.reason) || "This review link isn't valid.");
+
+      const ratings = {};
+      info.items.forEach(i => { if (i.review) ratings[i.product_id] = i.review.rating; });
+      const prevName = (info.items.find(i => i.review) || {}).review?.name;
+      main.innerHTML = `<h1>How did we do${info.name ? ", " + esc(info.name) : ""}?</h1>
+        <p class="lead">Tap the stars and add a few words if you like. Your review goes up on the product page.</p>
+        <form id="f">
+          ${info.items.map(i => `<div class="rv-item" data-id="${esc(i.product_id)}">
+            ${i.image ? `<img src="${esc(i.image)}" alt="">` : `<div class="ph"></div>`}
+            <div><h2>${esc(i.name)}</h2><div class="sz">${/^Top /.test(i.size || "") ? "" : "Size "}${esc(i.size || "")}</div>
+              <div class="pick" role="radiogroup" aria-label="Star rating">${[1, 2, 3, 4, 5].map(n => `<button type="button" data-n="${n}" aria-label="${n} star${n > 1 ? "s" : ""}">★</button>`).join("")}</div>
+              <textarea maxlength="1500" placeholder="What did you think? (optional)">${esc(i.review ? i.review.body : "")}</textarea></div></div>`).join("")}
+          <label class="name">Name to show with your review
+            <input type="text" name="name" maxlength="60" value="${esc(prevName ?? info.name ?? "")}" placeholder="e.g. Jay"></label>
+          <p class="small">Leave blank to show as "Verified buyer". We never show your surname, email or address.</p>
+          <div class="err" id="err"></div>
+          <button class="btn btn-accent btn-block" id="send">Post review</button>
+        </form>`;
+
+      const paint = item => item.querySelectorAll(".pick button").forEach(b => b.classList.toggle("on", Number(b.dataset.n) <= (ratings[item.dataset.id] || 0)));
+      document.querySelectorAll(".rv-item").forEach(item => {
+        paint(item);
+        item.querySelectorAll(".pick button").forEach(b => b.onclick = () => { ratings[item.dataset.id] = Number(b.dataset.n); paint(item); });
+      });
+
+      document.getElementById("f").onsubmit = async e => {
+        e.preventDefault();
+        const err = document.getElementById("err"), btn = document.getElementById("send");
+        const reviews = [...document.querySelectorAll(".rv-item")].filter(i => ratings[i.dataset.id])
+          .map(i => ({ product_id: i.dataset.id, rating: ratings[i.dataset.id], body: i.querySelector("textarea").value.trim() }));
+        if (!reviews.length) { err.textContent = "Tap the stars to give a rating first."; return; }
+        err.textContent = ""; btn.disabled = true; btn.textContent = "Posting…";
+        try {
+          await Store.submitReview(token, e.target.elements.name.value.trim(), reviews);
+          main.innerHTML = `<div class="done"><h1>Thank you!</h1><p class="lead">Your review is now on the website. Thanks for shopping with us.</p>
+            <a class="btn btn-accent" href="./">Back to the shop</a><p class="small" style="margin-top:1.5rem">Want to change it? Use the link in your email again.</p></div>`;
+        } catch (ex) { err.textContent = ex.message || "Something went wrong — please try again."; btn.disabled = false; btn.textContent = "Post review"; }
+      };
+    })();
+  </script>
+</body>
+</html>

@@ -232,8 +232,13 @@
       const all = ls.get("orders", []);
       const o = all.find(x => x.id === id); Object.assign(o, patch);
       if (patch.status === "shipped") o.shipped_at = now();
+      let reviewRequested = false;
+      if (patch.status === "delivered" && patch.ask_review !== false && !o.review_requested_at) {
+        o.review_token = uid(); o.review_requested_at = now(); reviewRequested = true;
+      }
+      delete o.ask_review;
       ls.set("orders", all);
-      return { demo: true, emailed: false };
+      return { demo: true, emailed: false, reviewRequested, order: o };
     },
 
     // Personal messages to customers (sent from the shop inbox, saved against the order)
@@ -335,6 +340,66 @@
         .or(`and(table_name.eq.orders,record_id.eq.${id}),and(table_name.eq.customer_messages,label.eq.${id})`)
         .order("at", { ascending: true }));
       return ls.get("activity", []).filter(a => (a.table_name === "orders" && a.record_id === id) || (a.table_name === "customer_messages" && a.label === id)).reverse();
+    },
+
+    // Reviews — customers get a private link by email when their order is marked delivered
+    async getReviews({ admin = false } = {}) {
+      if (LIVE) return q(client().from("reviews").select(admin ? "*" : "id,product_id,rating,body,name,created_at").order("created_at", { ascending: false }));
+      return ls.get("reviews", []).slice().sort((a, b) => b.created_at.localeCompare(a.created_at));
+    },
+    async deleteReview(id) {
+      if (LIVE) return q(client().from("reviews").delete().eq("id", id));
+      ls.set("reviews", ls.get("reviews", []).filter(r => r.id !== id));
+    },
+    async reviewInfo(token) {
+      if (LIVE) return fn("review", { token });
+      ensureSeed();
+      const o = ls.get("orders", []).find(x => x.review_token === token);
+      if (!o) return { valid: false, reason: "This review link isn't valid." };
+      const prods = ls.get("products", []), revs = ls.get("reviews", []);
+      const seen = new Set(), items = [];
+      for (const i of o.items || []) if (!seen.has(i.id)) {
+        seen.add(i.id);
+        items.push({ product_id: i.id, name: i.name, size: i.size, image: (prods.find(p => p.id === i.id) || {}).image || "",
+          review: revs.find(r => r.order_id === o.id && r.product_id === i.id) || null });
+      }
+      return { valid: true, name: (o.customer_name || "").split(" ")[0], items };
+    },
+    async submitReview(token, name, reviews) {
+      if (LIVE) return fn("review", { token, name, reviews });
+      const o = ls.get("orders", []).find(x => x.review_token === token);
+      if (!o) throw new Error("This review link isn't valid.");
+      let all = ls.get("reviews", []);
+      for (const r of reviews) {
+        all = all.filter(x => !(x.order_id === o.id && x.product_id === r.product_id));
+        all.push({ id: uid(), order_id: o.id, product_id: r.product_id, rating: r.rating, body: r.body || "", name, created_at: now() });
+      }
+      ls.set("reviews", all);
+      return { ok: true, saved: reviews.length };
+    },
+    async requestReview(orderId) {
+      if (LIVE) return fn("order-update", { id: orderId, review_only: true });
+      const all = ls.get("orders", []); const o = all.find(x => x.id === orderId);
+      o.review_token = o.review_token || uid(); o.review_requested_at = now(); ls.set("orders", all);
+      return { demo: true, reviewRequested: true, order: o };
+    },
+
+    // Expenses (things bought, for profit) — not part of shop stock
+    async getExpenses() {
+      if (LIVE) return q(client().from("expenses").select("*").order("bought_on", { ascending: false }).order("created_at", { ascending: false }));
+      return ls.get("expenses", []).slice().sort((a, b) => (b.bought_on || "").localeCompare(a.bought_on || "") || b.created_at.localeCompare(a.created_at));
+    },
+    async saveExpense(e) {
+      const row = { item: e.item, price: Number(e.price) || 0, website: e.website || "", notes: e.notes || "", bought_on: e.bought_on || new Date().toISOString().slice(0, 10) };
+      if (LIVE) return e.id ? q(client().from("expenses").update(row).eq("id", e.id).select().single())
+                            : q(client().from("expenses").insert(row).select().single());
+      const all = ls.get("expenses", []);
+      if (e.id) Object.assign(all.find(x => x.id === e.id), row); else all.push({ id: uid(), created_at: now(), ...row });
+      ls.set("expenses", all);
+    },
+    async deleteExpense(id) {
+      if (LIVE) return q(client().from("expenses").delete().eq("id", id));
+      ls.set("expenses", ls.get("expenses", []).filter(x => x.id !== id));
     },
 
     // Editable pages (Terms etc.) — Admin > Settings

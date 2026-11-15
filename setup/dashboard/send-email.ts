@@ -276,6 +276,18 @@ function orderShippedEmail({ orderId, name, items, carrier, trackingNumber, shop
   return { subject: `Your order ${orderId} is on its way 📦`, html: layout({ body, shopUrl, logoUrl, preheader: "Tracking details inside." }) };
 }
 
+/** Sent when an order is marked delivered: a private link to review what they bought. */
+function reviewRequestEmail({ orderId, name, items, url, shopUrl, logoUrl }) {
+  const names = [...new Set((items || []).map((i) => i.name))];
+  const body = `
+    ${heading("How did we do?")}
+    ${p(`Hi${first(name) ? " " + esc(first(name)) : ""} — your order <strong style="color:#fff">${esc(orderId)}</strong> should be with you now. We hope you love it.`)}
+    ${p(`Got a minute to leave a quick review of ${names.length === 1 ? `the <strong style="color:#fff">${esc(names[0])}</strong>` : "what you bought"}? It goes up on the website and really helps other people decide.`)}
+    ${button(url, "Leave a review")}
+    ${p("It only takes a few taps — pick a star rating and add a comment if you like. Any problem with your order? Just reply to this email instead.", `color:${C.muted};font-size:13px`)}`;
+  return { subject: "How's your order? Leave a quick review ⭐", html: layout({ body, shopUrl, logoUrl, preheader: "Tell us what you think — it takes a minute." }) };
+}
+
 /** Wraps a campaign written in admin. `inner` is HTML; SHOP_URL inside it is replaced. */
 function campaignEmail({ inner, shopUrl, logoUrl, preheader = "" }) {
   let src = String(inner).replace(/\r/g, "").trim();

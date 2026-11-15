@@ -7,8 +7,8 @@
   <title>HS Sourced It — Admin</title>
   <link rel="icon" href="images/favicon.png">
   <link href="https://fonts.googleapis.com/css2?family=Anton&family=Source+Serif+4:opsz,wght@8..60,900&family=Archivo:wght@400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=202611111504">
-  <link rel="stylesheet" href="css/admin.css?v=202611111504">
+  <link rel="stylesheet" href="css/style.css?v=202611152223">
+  <link rel="stylesheet" href="css/admin.css?v=202611152223">
 </head>
 <body class="admin">
   <!-- Login -->
@@ -31,6 +31,8 @@
         <button data-tab="orders">Orders</button>
         <button data-tab="customers">Customers</button>
         <button data-tab="offers">Offers</button>
+        <button data-tab="reviews">Reviews</button>
+        <button data-tab="expenses">Expenses</button>
         <button data-tab="email">Email</button>
         <button data-tab="activity">Activity</button>
         <button data-tab="settings">Settings</button>
@@ -82,6 +84,21 @@
         <div class="head"><h1>Offers</h1><input type="search" id="offerSearch" placeholder="Search name, email or item"><select id="offerFilter"><option value="">All</option><option value="open">Not used yet</option><option value="used">Used</option><option value="closed">Expired / cancelled</option></select></div>
         <p class="small" style="margin:-.8rem 0 1rem">Friends & family links. To send a new one, open a product in <strong>Stock</strong>.</p>
         <div class="table-wrap"><table class="tbl" id="offersTable"></table></div>
+      </section>
+
+      <!-- Reviews -->
+      <section data-panel="reviews" hidden>
+        <div class="head"><h1>Reviews</h1><input type="search" id="revSearch" placeholder="Search product, name or words"><select id="revFilter"><option value="">All ratings</option><option value="5">5 stars</option><option value="4">4 stars</option><option value="low">3 stars or less</option></select></div>
+        <p class="small" style="margin:-.8rem 0 1rem">When you mark an order <strong>delivered</strong>, the customer is emailed a link to review what they bought. Reviews appear under the product on the shop straight away. Delete any you don't want shown.</p>
+        <div class="panel"><div id="revList"><p class="small">Loading…</p></div></div>
+      </section>
+
+      <!-- Expenses -->
+      <section data-panel="expenses" hidden>
+        <div class="head"><h1>Expenses</h1><input type="search" id="expSearch" placeholder="Search item, website or notes"><button class="btn btn-accent" id="addExpense">+ Add expense</button></div>
+        <p class="small" style="margin:-.8rem 0 1rem">What you've spent (stock bought in, packaging, postage…). These don't change stock levels on the shop — they're taken off your takings to show profit on the Dashboard.</p>
+        <div class="kpis kpis-3" id="expTotals"></div>
+        <div class="table-wrap"><table class="tbl" id="expTable"></table></div>
       </section>
 
       <!-- Email -->
@@ -279,14 +296,29 @@
     </form>
   </div>
 
+  <div class="overlay" id="expEditor" hidden>
+    <form class="modal edit-modal" id="expForm">
+      <button type="button" class="close" data-close>×</button>
+      <h2 id="expTitle">Add expense</h2>
+      <div class="form-grid">
+        <label class="full">Item name <input name="item_name" required maxlength="200" placeholder="e.g. Jordan 1 Low Olive, UK 9"></label>
+        <label>Price paid (£) <input name="price" type="number" step="0.01" min="0" required inputmode="decimal"></label>
+        <label>Date bought <input name="bought_on" type="date" required></label>
+        <label class="full">Website <input name="website" placeholder="e.g. stockx.com or a link to the item"></label>
+        <label class="full">Notes <textarea name="notes" rows="3" placeholder="Optional — order number, what it's for…"></textarea></label>
+      </div>
+      <div class="row-btns"><button type="button" class="btn btn-ghost danger" id="expDelete">Delete</button><button class="btn btn-accent">Save expense</button></div>
+    </form>
+  </div>
+
   <div class="toast" id="toast"></div>
 
-  <script src="js/config.js?v=202611111504"></script>
+  <script src="js/config.js?v=202611152223"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/data.js?v=202611111504"></script>
-  <script src="js/markdown.js?v=202611111504"></script>
-  <script src="js/default-pages.js?v=202611111504"></script>
-  <script src="js/admin.js?v=202611111504"></script>
+  <script src="js/data.js?v=202611152223"></script>
+  <script src="js/markdown.js?v=202611152223"></script>
+  <script src="js/default-pages.js?v=202611152223"></script>
+  <script src="js/admin.js?v=202611152223"></script>
   <script type="module">
     import * as T from "./supabase/functions/_shared/templates.js";
     window.EMAIL_T = T;

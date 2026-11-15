@@ -33,6 +33,24 @@
     clearTimeout(tt); tt = setTimeout(() => t.classList.remove("show"), 2600);
   }
 
+  // ---------- reviews (left by customers from the link we email after delivery) ----------
+  let reviews = [];
+  const revsFor = id => reviews.filter(r => r.product_id === id);
+  const starStr = n => "★".repeat(Math.round(n)) + "☆".repeat(5 - Math.round(n));
+  function ratingLine(id, cls = "") {
+    const rs = revsFor(id); if (!rs.length) return "";
+    const avg = rs.reduce((a, r) => a + r.rating, 0) / rs.length;
+    return `<div class="rating ${cls}" aria-label="Rated ${avg.toFixed(1)} out of 5"><span class="stars">${starStr(avg)}</span> ${avg.toFixed(1)} <span class="rcount">(${rs.length})</span></div>`;
+  }
+  function reviewsHtml(p) {
+    const rs = revsFor(p.id); if (!rs.length) return "";
+    const one = r => `<div class="review"><div><span class="stars">${starStr(r.rating)}</span> <strong>${esc(r.name || "Verified buyer")}</strong> <span class="small">· ${new Date(r.created_at).toLocaleDateString("en-GB", { month: "short", year: "numeric" })}</span></div>${r.body ? `<p>${esc(r.body)}</p>` : ""}</div>`;
+    return `<section class="reviews" id="pmReviews"><h3>Reviews ${ratingLine(p.id, "inline")}</h3>
+      ${rs.slice(0, 4).map(one).join("")}
+      ${rs.length > 4 ? `<div id="moreRevs" hidden>${rs.slice(4).map(one).join("")}</div><button type="button" class="link-btn" id="moreRevsBtn">Show all ${rs.length} reviews</button>` : ""}
+      <p class="small">All reviews are from customers who bought this item.</p></section>`;
+  }
+
   // ---------- render grid ----------
   function renderGrid() {
     let list = products.filter(p => filter === "all" || p.category === filter);
@@ -47,7 +65,7 @@
       const low = stock > 0 && stock <= C.lowStockThreshold * 2 ? `<div class="low">Selling fast</div>` : "";
       return `<article class="card" data-id="${esc(p.id)}" style="animation-delay:${i * 40}ms" tabindex="0">
         <div class="card-img">${imgTag(p.image, p.name)}${badge}<div class="quick">Quick view</div></div>
-        <div class="card-info"><div><h3>${esc(p.name)}</h3><div class="cat">${esc(p.category)}</div>${low}</div><div class="price">${money(p.price)}</div></div>
+        <div class="card-info"><div><h3>${esc(p.name)}</h3><div class="cat">${esc(p.category)}</div>${ratingLine(p.id)}${low}</div><div class="price">${money(p.price)}</div></div>
       </article>`;
     }).join("");
   }
@@ -86,13 +104,17 @@
         <p class="eyebrow">${esc(p.category)}</p>
         <h2>${esc(p.name)}</h2>
         <div class="pm-price-row"><div class="pm-price">${money(p.price)}</div><button type="button" class="share-btn" id="shareBtn">Share ↗</button></div>
+        ${revsFor(p.id).length ? `<button type="button" class="rating-jump" id="toRevs">${ratingLine(p.id, "inline")}</button>` : ""}
         <p class="small">Delivery ${shipCostOf(p) > 0 ? money(shipCostOf(p)) : "free"} · free when you order ${FREE_N}+ items</p>
         <p class="pm-desc">${esc(p.description)}</p>
         ${sizePickerHtml(p)}
         <div class="stock-note" id="stockNote"></div>
         <button class="btn btn-accent btn-block" id="addBtn" disabled>${waitText(p)}</button>
+        ${reviewsHtml(p)}
       </div></div>`;
     $("#shareBtn").onclick = () => shareProduct(p);
+    if ($("#toRevs")) $("#toRevs").onclick = () => $("#pmReviews").scrollIntoView({ behavior: "smooth", block: "start" });
+    if ($("#moreRevsBtn")) $("#moreRevsBtn").onclick = () => { $("#moreRevs").hidden = false; $("#moreRevsBtn").remove(); };
     wireSizes(p, (size, pick) => {
       selected = size;
       if (!size) { $("#stockNote").textContent = ""; $("#addBtn").disabled = true; $("#addBtn").textContent = waitText(p, pick); return; }
@@ -318,6 +340,7 @@
     // refresh cart prices / drop removed products
     cart = cart.filter(l => products.some(p => p.id === l.id)).map(l => ({ ...l, price: products.find(p => p.id === l.id).price }));
     renderGrid(); renderCart();
+    Store.getReviews().then(r => { reviews = r || []; if (reviews.length) renderGrid(); }).catch(() => {});
     // Footer link to the Terms page once it's switched on in Admin > Settings
     Store.publishedPages().then(pages => {
       if (!pages.some(p => p.slug === "terms") || $("#termsLink")) return;

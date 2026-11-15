@@ -199,3 +199,34 @@ ol.hist li { padding: .55rem 0; border-bottom: 1px solid var(--line); line-heigh
 ol.hist li:last-child { border-bottom: 0; }
 .oc-status .msg-count { margin-top: .5rem; }
 .split-head { margin: .9rem 0 .4rem; font-size: .85rem; letter-spacing: .06em; text-transform: uppercase; }
+
+/* Reviews */
+.rev-row { padding: .9rem 0; border-bottom: 1px solid var(--line); }
+.rev-row:last-child { border-bottom: 0; }
+.rev-stars { color: #f5c518; letter-spacing: .1em; }
+.rev-body { margin: .35rem 0; white-space: pre-wrap; }
+.rev-line { margin-top: .35rem; }
+.link.danger, .danger.link { color: #ff6b6b; }
+
+/* Dashboard profit colours + expenses */
+.kpi .val.pos { color: #5ee08a; }
+.kpi .val.neg { color: #ff6b6b; }
+.kpi .small { margin-top: .2rem; }
+.kpis-3 { grid-template-columns: repeat(3, 1fr); margin-bottom: 1rem; }
+.kpis-3 .val { font-size: 1.6rem; }
+.ec-notes { max-width: 22rem; white-space: pre-wrap; }
+@media (max-width: 720px) {
+  .kpis-3 { grid-template-columns: repeat(3, 1fr); gap: .5rem; }
+  .kpis-3 .kpi { padding: .7rem; }
+  .kpis-3 .val { font-size: 1.15rem; }
+  /* expense rows as cards */
+  #expTable thead { display: none; }
+  #expTable tr.ec { display: grid; grid-template-columns: 1fr auto; gap: .15rem .8rem; padding: .8rem; border: 1px solid var(--line); border-radius: 8px; margin-bottom: .6rem; }
+  #expTable tr.ec td { display: block; padding: 0; border: 0; background: none; }
+  #expTable .ec-item { grid-column: 1; grid-row: 1; }
+  #expTable .ec-price { grid-column: 2; grid-row: 1; font-weight: 700; text-align: right; }
+  #expTable .ec-date { grid-column: 1; grid-row: 2; color: var(--muted); font-size: .85rem; }
+  #expTable .ec-site { grid-column: 2; grid-row: 2; text-align: right; font-size: .85rem; }
+  #expTable .ec-notes { grid-column: 1 / -1; }
+  #expTable .ec-notes:empty { display: none; }
+}

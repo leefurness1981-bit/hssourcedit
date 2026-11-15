@@ -3,7 +3,7 @@
   const { sizeEntries, isSplit, splitEntries, money, esc, imgTag, totalStock } = window.KERB;
   const $ = s => document.querySelector(s);
   const $$ = s => [...document.querySelectorAll(s)];
-  let products = [], orders = [], customers = [], campaigns = [], offers = [], messages = [];
+  let products = [], orders = [], customers = [], campaigns = [], offers = [], messages = [], reviews = [], expenses = [];
   const msgsForOrder = id => messages.filter(m => m.order_id === id);
 
   let tt;
@@ -53,6 +53,9 @@
       ]);
     } catch (err) { toast("Load failed: " + err.message); return; }
     try { messages = await Store.getAllMessages(); } catch (err) { messages = []; console.warn("Messages unavailable:", err.message); }
+    try { reviews = await Store.getReviews({ admin: true }); } catch (err) { reviews = []; console.warn("Reviews unavailable:", err.message); }
+    try { expenses = await Store.getExpenses(); } catch (err) { expenses = []; console.warn("Expenses unavailable:", err.message); }
+    renderReviews(); renderExpenses();
     renderDashboard(); renderStock(); renderOrders(); renderCustomers(); renderEmail();
     loadOffers();
   }
@@ -63,7 +66,7 @@
 
   // ---------- tabs ----------
   // Tabs work with the phone's back gesture: any tab → back → Dashboard (never straight out to the shop)
-  const TABS = ["dashboard", "stock", "orders", "customers", "offers", "email", "activity", "settings"];
+  const TABS = ["dashboard", "stock", "orders", "customers", "offers", "reviews", "expenses", "email", "activity", "settings"];
   let curTab = "dashboard";
   function showTab(tab) {
     curTab = tab;
@@ -71,7 +74,7 @@
     $$("[data-panel]").forEach(p => (p.hidden = p.dataset.panel !== tab));
     window.scrollTo(0, 0);
     if (tab === "settings") loadTermsEditor();
-    if (["dashboard", "orders", "customers", "stock", "email"].includes(tab)) refreshSoon();
+    if (["dashboard", "orders", "customers", "stock", "email", "reviews", "expenses"].includes(tab)) refreshSoon();
     if (tab === "activity") loadActivity(true);
   }
   function goTab(tab) {
@@ -104,10 +107,19 @@
     const units = products.reduce((a, p) => a + totalStock(p), 0);
     const subs = customers.filter(c => c.marketing_opt_in).length;
     const toShip = orders.filter(o => o.status === "paid" || o.status === "packed").length;
+    // Profit = money taken (after refunds) minus everything logged in Expenses
+    const spent = expenses.reduce((a, e) => a + Number(e.price || 0), 0);
+    const monthSpent = expenses.filter(e => (e.bought_on || "").startsWith(month)).reduce((a, e) => a + Number(e.price || 0), 0);
+    const profit = revenue - spent, monthProfit = monthRev - monthSpent;
+    const signed = n => (n < 0 ? "−" : "") + money(Math.abs(n));
     $("#kpis").innerHTML = [
-      ["Revenue (all time)", money(revenue)], ["This month", money(monthRev)], ["Orders to ship", toShip],
-      ["Units in stock", units], ["Customers", customers.length], ["Subscribers", subs]
-    ].map(([l, v], i) => `<button type="button" class="kpi kpi-link" data-kpi="${i}"><div class="label">${l}</div><div class="val">${v}</div></button>`).join("");
+      ["Revenue (all time)", money(revenue), "", "orders"],
+      ["Spent (all time)", money(spent), "", "expenses"],
+      ["Profit (all time)", signed(profit), profit < 0 ? "neg" : "pos", "expenses"],
+      ["Profit this month", signed(monthProfit), monthProfit < 0 ? "neg" : "pos", "expenses", `${money(monthRev)} in · ${money(monthSpent)} out`],
+      ["Orders to ship", toShip, "", "toship"], ["Units in stock", units, "", "stock"],
+      ["Customers", customers.length, "", "customers"], ["Subscribers", subs, "", "subs"]
+    ].map(([l, v, cls, go, sub]) => `<button type="button" class="kpi kpi-link" data-kpi="${go}"><div class="label">${l}</div><div class="val ${cls}">${v}</div>${sub ? `<div class="small">${sub}</div>` : ""}</button>`).join("");
 
     // What he actually has on the shelf (sizes with 1+ in stock), grouped by product
     const have = [];
@@ -349,6 +361,29 @@
     } catch (err) { toast(err.message); }
     finally { btn.disabled = false; btn.textContent = "Send message"; }
   };
+  // Review line on each order: reviewed / asked / button to ask
+  function reviewCell(o) {
+    if (!o.customer_email || o.status === "refunded") return "";
+    const got = reviews.filter(r => r.order_id === o.id);
+    if (got.length) return `<button type="button" class="msg-count" data-gorev="${esc(o.id)}">⭐ Reviewed (${got.map(r => r.rating + "★").join(", ")})</button>`;
+    if (o.review_requested_at) return `<div class="small rev-line">⭐ Review asked ${fmtDate(o.review_requested_at)} · <button type="button" class="link small" data-askrev="${esc(o.id)}">send again</button></div>`;
+    if (o.status === "shipped" || o.status === "delivered") return `<button type="button" class="msg-count" data-askrev="${esc(o.id)}">⭐ Ask for a review</button>`;
+    return "";
+  }
+  $("#ordersTable").addEventListener("click", async e => {
+    const g = e.target.closest("[data-gorev]");
+    if (g) { goTab("reviews"); $("#revSearch").value = g.dataset.gorev; $("#revFilter").value = ""; return renderReviews(); }
+    const b = e.target.closest("[data-askrev]"); if (!b) return;
+    const o = orders.find(x => x.id === b.dataset.askrev);
+    if (!confirm(`Email ${o.customer_email} a link to review their order?`)) return;
+    b.disabled = true;
+    try {
+      const res = await Store.requestReview(o.id);
+      Object.assign(o, res.order || { review_requested_at: new Date().toISOString() });
+      toast(res.demo ? "Review link made (demo — email not sent)" : `Review request sent to ${o.customer_email} ✓`);
+      renderOrders();
+    } catch (err) { toast(err.message); b.disabled = false; }
+  });
   function renderOrders() {
     const st = $("#orderFilter").value;
     const term = $("#orderSearch").value.trim().toLowerCase();
@@ -361,7 +396,7 @@
         <td class="oc-cust">${esc(o.customer_name || "")}<div class="small">${esc(o.customer_email)}</div>${o.shipping_address ? `<div class="small">${esc(o.shipping_address)}</div>` : ""}${o.customer_email ? `<button type="button" class="email-cust" data-msg="${esc(o.id)}">✉ Message customer</button>` : ""}${msgsForOrder(o.id).length ? `<button type="button" class="msg-count" data-msg="${esc(o.id)}">💬 ${msgsForOrder(o.id).length} message${msgsForOrder(o.id).length === 1 ? "" : "s"} · view</button>` : ""}</td>
         <td class="oc-items">${(o.items || []).map(i => `<div class="oc-item">${i.qty}× ${esc(i.name)} <span class="small">(${esc(i.size)})</span>${i.backorder ? ` <span class="pill wait">${esc(i.lead_time || "Out of stock")}</span>` : ""}</div>`).join("")}</td>
         <td class="oc-hide">${money(o.total)}</td>
-        <td class="oc-status"><select data-oid="${esc(o.id)}">${STATUSES.map(s => `<option ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}</select><button type="button" class="msg-count" data-hist="${esc(o.id)}">🕘 History</button></td>
+        <td class="oc-status"><select data-oid="${esc(o.id)}">${STATUSES.map(s => `<option ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}</select><button type="button" class="msg-count" data-hist="${esc(o.id)}">🕘 History</button>${reviewCell(o)}</td>
         <td class="oc-track">${trackCell(o)}</td></tr>`).join("")
       : `<tr><td colspan="7" class="small">${$("#orderSearch").value.trim() || $("#orderFilter").value ? "No orders match your search." : "No orders."}</td></tr>`) + "</tbody>";
   }
@@ -371,7 +406,17 @@
     const id = e.target.dataset.oid; if (!id) return;
     const o = orders.find(x => x.id === id);
     if (e.target.value === "shipped") { e.target.value = o.status; return openShip(o); }
-    try { await Store.updateOrder(id, { status: e.target.value, carrier: o.carrier || "", tracking_number: o.tracking_number || "" }); o.status = e.target.value; toast(`${id} marked ${e.target.value}`); renderOrders(); renderDashboard(); }
+    const status = e.target.value;
+    // Marking delivered emails the customer a review link (first time only)
+    const willAsk = status === "delivered" && o.customer_email && !o.review_requested_at;
+    try {
+      const res = await Store.updateOrder(id, { status, carrier: o.carrier || "", tracking_number: o.tracking_number || "" });
+      if (res && res.order) Object.assign(o, res.order); o.status = status;
+      toast(res && res.reviewError ? res.reviewError
+        : res && res.reviewRequested ? `${id} delivered — ${res.demo ? "review link made (demo: no email)" : "review request emailed ✓"}`
+        : willAsk && res && !res.demo ? `${id} marked delivered` : `${id} marked ${status}`);
+      renderOrders(); renderDashboard();
+    }
     catch (err) { toast(err.message); }
   });
   $("#ordersTable").addEventListener("click", e => { const b = e.target.closest("[data-ship]"); if (b) openShip(orders.find(o => o.id === b.dataset.ship)); });
@@ -429,10 +474,10 @@
   // Dashboard numbers open the matching list
   $("#kpis").addEventListener("click", e => {
     const k = e.target.closest("[data-kpi]"); if (!k) return;
-    const i = Number(k.dataset.kpi);
-    if (i <= 2) { goTab("orders"); $("#orderSearch").value = ""; $("#orderFilter").value = i === 2 ? "toship" : ""; renderOrders(); }
-    else if (i === 3) { goTab("stock"); }
-    else { goTab("customers"); $("#custSearch").value = ""; $("#custFilter").value = i === 5 ? "subs" : ""; renderCustomers(); }
+    const go = k.dataset.kpi;
+    if (go === "orders" || go === "toship") { goTab("orders"); $("#orderSearch").value = ""; $("#orderFilter").value = go === "toship" ? "toship" : ""; renderOrders(); }
+    else if (go === "stock" || go === "expenses") goTab(go);
+    else { goTab("customers"); $("#custSearch").value = ""; $("#custFilter").value = go === "subs" ? "subs" : ""; renderCustomers(); }
   });
   $("#custTable").addEventListener("click", e => { const r = e.target.closest("[data-email]"); if (r) editCustomer(r.dataset.email); });
   $("#addCustomer").onclick = () => editCustomer(null);
@@ -597,21 +642,24 @@
     marketing_opt_in: ["marketing", onoff], tags: ["tags", v => (v || []).join(", ") || "none"], phone: ["phone", v => v || "—"],
     order_count: ["orders", v => v], total_spent: ["total spent", gbp], refunded_amount: ["refunded", gbp], welcome_code: ["welcome code", v => v || "—"],
     title: ["title", v => v], published: ["on the site", v => (v ? "shown" : "hidden")], max_qty: ["max items", v => v],
-    expires_at: ["expires", v => (v ? fmtDate(v) : "never")]
+    expires_at: ["expires", v => (v ? fmtDate(v) : "never")],
+    item: ["item", v => v], website: ["website", v => v || "—"], bought_on: ["date bought", v => (v ? fmtDate(v) : "—")]
   };
-  const QUIET = ["shipped_at", "created_at", "welcome_sent_at", "welcome_code_expires_at", "welcome_code_failed_at", "reserved_until", "stripe_session_id", "used_at", "image"];
+  const QUIET = ["review_token", "review_requested_at", "shipped_at", "created_at", "welcome_sent_at", "welcome_code_expires_at", "welcome_code_failed_at", "reserved_until", "stripe_session_id", "used_at", "image"];
   function describe(a) {
     if (a.action === "event") return a.summary;
     const c = a.changes || {}, t = a.table_name;
-    const noun = { products: "product", orders: "order", customers: "customer", offers: "friends & family offer", site_pages: "page", customer_messages: "message" }[t] || t;
+    const noun = { products: "product", orders: "order", customers: "customer", offers: "friends & family offer", site_pages: "page", customer_messages: "message", reviews: "review", expenses: "expense" }[t] || t;
     if (a.action === "insert") {
       if (t === "orders") return `Order placed and paid · ${gbp(c.total)} · ${c.customer_email || ""}`;
       if (t === "customers") return c.marketing_opt_in ? "Joined the mailing list" : "New customer";
       if (t === "offers") return `Offer created for ${c.email} · ${gbp(c.price)}`;
       if (t === "customer_messages") return `Message sent to customer: "${c.subject || ""}"`;
+      if (t === "reviews") return `Review left · ${c.rating}★${c.name ? " by " + c.name : ""}`;
+      if (t === "expenses") return `Expense added · ${gbp(c.price)}`;
       return `Added ${noun}`;
     }
-    if (a.action === "delete") return `Deleted ${noun}`;
+    if (a.action === "delete") return t === "reviews" ? `Deleted a ${c.rating}★ review${c.name ? " by " + c.name : ""}` : t === "expenses" ? `Deleted expense · ${gbp(c.price)}` : `Deleted ${noun}`;
     const parts = [];
     for (const [k, [from, to]] of Object.entries(c)) {
       if (k === "sizes") {
@@ -669,6 +717,77 @@
     } catch (err) { $("#histList").innerHTML = `<p class="small">Couldn't load history: ${esc(err.message)}</p>`; }
   }
   $("#ordersTable").addEventListener("click", e => { const b = e.target.closest("[data-hist]"); if (b) openHistory(b.dataset.hist); });
+
+  // ---------- reviews ----------
+  const stars = n => "★★★★★".slice(0, n) + "☆☆☆☆☆".slice(0, 5 - n);
+  function renderReviews() {
+    const term = $("#revSearch").value.trim().toLowerCase(), f = $("#revFilter").value;
+    const pname = id => (products.find(p => p.id === id) || {}).name || id;
+    const list = reviews.filter(r => (!f || (f === "low" ? r.rating <= 3 : r.rating === Number(f))) &&
+      (!term || term.split(/\s+/).every(w => [pname(r.product_id), r.name, r.body, r.order_id].join(" ").toLowerCase().includes(w))));
+    const avg = reviews.length ? (reviews.reduce((a, r) => a + r.rating, 0) / reviews.length).toFixed(1) : "–";
+    $("#revList").innerHTML = (reviews.length ? `<p class="small">${reviews.length} review${reviews.length === 1 ? "" : "s"} · average ${avg} ★</p>` : "") +
+      (list.length ? list.map(r => `<div class="rev-row">
+        <div class="rev-top"><span class="rev-stars">${stars(r.rating)}</span> <strong>${esc(pname(r.product_id))}</strong></div>
+        ${r.body ? `<div class="rev-body">${esc(r.body)}</div>` : ""}
+        <div class="small">${esc(r.name || "Anonymous")} · ${fmtDate(r.created_at)}${r.order_id ? ` · <button type="button" class="link small" data-goto="${esc(r.order_id)}">${esc(r.order_id)}</button>` : ""}
+          · <button type="button" class="link small danger" data-delrev="${esc(r.id)}">Delete</button></div></div>`).join("")
+      : `<p class="small">${reviews.length ? "No reviews match." : "No reviews yet. They come in after you mark orders delivered."}</p>`);
+  }
+  $("#revSearch").oninput = renderReviews;
+  $("#revFilter").onchange = renderReviews;
+  $("#revList").addEventListener("click", async e => {
+    const o = e.target.closest("[data-goto]"); if (o) return goToOrder(o.dataset.goto);
+    const d = e.target.closest("[data-delrev]"); if (!d) return;
+    if (!confirm("Delete this review? It will be removed from the shop and can't be brought back.")) return;
+    try { await Store.deleteReview(d.dataset.delrev); reviews = reviews.filter(r => r.id !== d.dataset.delrev); renderReviews(); renderOrders(); toast("Review deleted"); }
+    catch (err) { toast(err.message); }
+  });
+
+  // ---------- expenses (spending, for profit — not shop stock) ----------
+  function renderExpenses() {
+    const term = $("#expSearch").value.trim().toLowerCase();
+    const list = expenses.filter(x => !term || term.split(/\s+/).every(w => [x.item, x.website, x.notes].join(" ").toLowerCase().includes(w)));
+    const month = new Date().toISOString().slice(0, 7), year = month.slice(0, 4);
+    const sum = arr => arr.reduce((a, x) => a + Number(x.price || 0), 0);
+    $("#expTotals").innerHTML = [["This month", sum(expenses.filter(x => (x.bought_on || "").startsWith(month)))],
+      ["This year", sum(expenses.filter(x => (x.bought_on || "").startsWith(year)))], ["All time", sum(expenses)]]
+      .map(([l, v]) => `<div class="kpi"><div class="label">${l}</div><div class="val">${money(v)}</div></div>`).join("");
+    const site = w => !w ? "" : /^https?:\/\//i.test(w) ? `<a href="${esc(w)}" target="_blank" rel="noopener">${esc(w.replace(/^https?:\/\/(www\.)?/i, "").split("/")[0])}</a>` : esc(w);
+    $("#expTable").innerHTML = `<thead><tr><th>Date</th><th>Item</th><th>Price</th><th>Website</th><th>Notes</th></tr></thead><tbody>` +
+      (list.length ? list.map(x => `<tr class="click ec" data-exp="${esc(x.id)}">
+        <td class="ec-date">${fmtDate(x.bought_on)}</td><td class="ec-item"><strong>${esc(x.item)}</strong></td><td class="ec-price">${money(x.price)}</td>
+        <td class="ec-site">${site(x.website)}</td><td class="ec-notes small">${esc(x.notes)}</td></tr>`).join("")
+      : `<tr><td colspan="5" class="small">${term ? "Nothing matches." : "Nothing logged yet. Tap + Add expense when you buy stock."}</td></tr>`) + "</tbody>";
+  }
+  $("#expSearch").oninput = renderExpenses;
+  let expEditing = null;
+  function editExpense(id) {
+    expEditing = id ? expenses.find(x => x.id === id) : null;
+    const f = $("#expForm"); f.reset();
+    $("#expTitle").textContent = expEditing ? "Edit expense" : "Add expense";
+    f.elements.item_name.value = expEditing ? expEditing.item : "";
+    f.elements.price.value = expEditing ? Number(expEditing.price).toFixed(2) : "";
+    f.elements.bought_on.value = expEditing ? expEditing.bought_on : new Date().toISOString().slice(0, 10);
+    f.elements.website.value = expEditing ? expEditing.website : "";
+    f.elements.notes.value = expEditing ? expEditing.notes : "";
+    $("#expDelete").hidden = !expEditing;
+    open("#expEditor"); if (!expEditing) f.elements.item_name.focus();
+  }
+  $("#addExpense").onclick = () => editExpense(null);
+  $("#expTable").addEventListener("click", e => { if (e.target.closest("a")) return; const r = e.target.closest("[data-exp]"); if (r) editExpense(r.dataset.exp); });
+  $("#expForm").onsubmit = async e => {
+    e.preventDefault(); const f = e.target;
+    const row = { id: expEditing && expEditing.id, item: f.elements.item_name.value.trim(), price: f.elements.price.value,
+      bought_on: f.elements.bought_on.value, website: f.elements.website.value.trim(), notes: f.elements.notes.value.trim() };
+    try { await Store.saveExpense(row); expenses = await Store.getExpenses(); close("#expEditor"); renderExpenses(); renderDashboard(); toast("Expense saved"); }
+    catch (err) { toast(err.message); }
+  };
+  $("#expDelete").onclick = async () => {
+    if (!expEditing || !confirm(`Delete "${expEditing.item}" (${money(expEditing.price)})?`)) return;
+    try { await Store.deleteExpense(expEditing.id); expenses = expenses.filter(x => x.id !== expEditing.id); close("#expEditor"); renderExpenses(); renderDashboard(); toast("Expense deleted"); }
+    catch (err) { toast(err.message); }
+  };
 
   // ---------- settings ----------
   // ---------- Terms page editor (Settings) ----------
