@@ -1,0 +1,14 @@
+name: check-reviews
+on: workflow_dispatch
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          KEY=$(grep -oP 'supabaseAnonKey:\s*"\K[^"]+' js/config.js)
+          U=https://ndefypnaczwiryiiqopm.supabase.co
+          echo "anon read reviews:"; curl -s -o /dev/null -w "%{http_code}\n" "$U/rest/v1/reviews?select=id,product_id,rating,body,name,created_at" -H "apikey: $KEY" -H "Authorization: Bearer $KEY"
+          echo "anon read order_id (should be refused):"; curl -s -o /dev/null -w "%{http_code}\n" "$U/rest/v1/reviews?select=order_id" -H "apikey: $KEY" -H "Authorization: Bearer $KEY"
+          echo "anon read expenses (should be empty):"; curl -s "$U/rest/v1/expenses?select=id" -H "apikey: $KEY" -H "Authorization: Bearer $KEY"; echo
+          echo "review fn bad token:"; curl -s -X POST "$U/functions/v1/review" -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{"token":"nope"}'; echo
